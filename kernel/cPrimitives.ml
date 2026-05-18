@@ -399,7 +399,7 @@ let one_param =
   (* currently if there's a parameter it's always this *)
   let a_annot = Context.nameR (Names.Id.of_string "A") in
   let ty = Constr.mkType (Universe.make (Level.var 0)) in
-  Context.Rel.Declaration.[LocalAssum (a_annot, ty)]
+  Context.Rel.(add LocalAssum (a_annot, ty) empty)
 
 let params = function
   | Int63head0
@@ -456,7 +456,7 @@ let params = function
   | Stringget
   | Stringsub
   | Stringcat
-  | Stringcompare -> []
+  | Stringcompare -> Context.Rel.empty
 
   | Arraymake
   | Arrayget

@@ -136,7 +136,7 @@ sig
   (** Rel-context is represented as a list of declarations.
       Inner-most declarations are at the beginning of the list.
       Outer-most declarations are at the end of the list. *)
-  type ('constr, 'types, 'r) pt = ('constr, 'types, 'r) Declaration.pt list
+  type ('constr, 'types, 'r) pt (* = ('constr, 'types, 'r) Declaration.pt list *)
 
   (** empty rel-context *)
   val empty : ('c, 't, 'r) pt
