@@ -556,10 +556,11 @@ let make_case_or_project env sigma indt ci pred c branches =
 (* substitution in a signature *)
 
 let substnl_rel_context subst n sign =
-  let rec aux n = function
-  | d::sign -> substnl_decl subst n d :: aux (n+1) sign
-  | [] -> []
-  in List.rev (aux n (List.rev sign))
+  let rec aux n sign =
+    match Context.Rel.to_list sign with
+    | d::sign' -> substnl_decl subst n d :: aux (n+1) (Context.Rel.of_list sign')
+    | [] -> []
+  in Context.Rel.of_list (List.rev (aux n (Context.Rel.rev sign)))
 
 let substl_rel_context subst = substnl_rel_context subst 0
 
@@ -581,11 +582,9 @@ let get_arity env ((ind,u),params) =
   let arsign, _ = List.chop arproperlength (Context.Rel.to_list mip.mind_arity_ctxt) in
   let arsign = EConstr.of_rel_context (Context.Rel.of_list arsign) in
   let parsign_ec = EConstr.of_rel_context parsign in
-  let subst = subst_of_rel_context_instance_list parsign_ec params in
+  let subst = EConstr.Vars.subst_of_rel_context_instance_list parsign_ec params in
   let arsign = EConstr.Vars.subst_instance_context u arsign in
-  let arsign = Context.Rel.to_list arsign in
-  let arsign = substl_rel_context subst arsign in
-  Context.Rel.of_list arsign
+  substl_rel_context subst arsign
 
 (* Functions to build standard types related to inductive *)
 let build_dependent_constructor cs =
