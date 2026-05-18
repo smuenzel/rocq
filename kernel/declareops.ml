@@ -123,7 +123,7 @@ let subst_const_body subst cb =
 let hcons_rel_decl =
   RelDecl.map_name (noh Names.Name.hcons) %> RelDecl.map_value (noh Constr.hcons) %> RelDecl.map_type (noh Constr.hcons)
 
-let hcons_rel_context l = Context.Rel.map_decl hcons_rel_decl l
+let hcons_rel_context l = Context.Rel.map_decl_smart hcons_rel_decl l
 
 let hcons_const_def ?(hbody=noh Constr.hcons) = function
   | Undef inl -> Undef inl

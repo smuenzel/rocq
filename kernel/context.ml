@@ -286,7 +286,9 @@ struct
     in
     aux (length ctx) ctx
 
-  let map_decl f = List.Smart.map f
+  let map_decl f = List.map f
+
+  let map_decl_smart f = List.Smart.map f
 
   let filter f = List.filter f
 

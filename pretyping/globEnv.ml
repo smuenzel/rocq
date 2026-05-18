@@ -78,7 +78,7 @@ let push_rel ~hypnaming sigma d env =
 
 let push_rel_context ~hypnaming ?(force_names=false) sigma ctx env =
   let open Context.Rel.Declaration in
-  let ctx' = Context.Rel.map_decl (map_name (ltac_interp_name env.lvar)) ctx in
+  let ctx' = Context.Rel.map_decl_smart (map_name (ltac_interp_name env.lvar)) ctx in
   let ctx' = if force_names then Namegen.name_context env.renamed_env sigma ctx' else ctx' in
   let env = {
     static_env = push_rel_context ctx env.static_env;

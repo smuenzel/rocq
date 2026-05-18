@@ -190,9 +190,13 @@ sig
       position of the binder in the context starting at 1. *)
   val map_with_binders : (int -> 'c -> 'c) -> ('c, 'c, 'r) pt -> ('c, 'c, 'r) pt
 
-  (** Map a function over each declaration in the context, preserving
-      physical equality when no declaration changes. *)
-  val map_decl : (('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) Declaration.pt) ->
+  (** Map a function over each declaration in the context. *)
+  val map_decl : (('c1, 't1, 'r1) Declaration.pt -> ('c2, 't2, 'r2) Declaration.pt) ->
+    ('c1, 't1, 'r1) pt -> ('c2, 't2, 'r2) pt
+
+  (** Like {!map_decl} but returns the original context unchanged if no
+      declaration is modified (checked via physical equality). *)
+  val map_decl_smart : (('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) Declaration.pt) ->
     ('c, 't, 'r) pt -> ('c, 't, 'r) pt
 
   (** Keep only declarations satisfying a predicate. *)

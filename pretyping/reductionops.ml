@@ -1745,6 +1745,6 @@ let eta_expand env sigma t ty =
 
 let eta_expand_instantiation env sigma inst ctxt =
   let inst = Array.map (EConstr.Unsafe.to_constr) inst in
-  let ctxt =  Context.Rel.of_list (List.map (EConstr.Unsafe.to_rel_decl) (Context.Rel.to_list ctxt)) in
+  let ctxt = Context.Rel.map_decl EConstr.Unsafe.to_rel_decl ctxt in
   let eta_inst = Termops.eta_expand_instantiation ~evars:(Evd.evar_handler sigma) env inst ctxt in
   Array.map of_constr eta_inst
