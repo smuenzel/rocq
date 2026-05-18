@@ -461,7 +461,7 @@ let clean_hyp_with_heq ptes_infos eq_hyps hyp_id env sigma =
           tclTHEN tac (scan_type new_context new_t')
         with NoChange ->
           (* Last thing todo : push the rel in the context and continue *)
-          scan_type (Context.Rel.of_list (LocalAssum (x, t_x) :: Context.Rel.to_list context)) t'
+          scan_type (Context.Rel.add (LocalAssum (x, t_x)) context) t'
     else tclIDTAC
   in
   try (scan_type Context.Rel.empty (Typing.type_of_variable env hyp_id), [hyp_id])

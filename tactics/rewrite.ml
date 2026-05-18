@@ -964,7 +964,7 @@ let fold_match ?(force=false) env sigma c =
     let sortc = Retyping.get_sort_quality_of env sigma cty in
     let dep = not (noccurn sigma 1 body) in
     let pred = if dep then p else
-        it_mkProd_or_LetIn (subst1 mkProp body) (Context.Rel.of_list (List.tl (Context.Rel.to_list ctx)))
+        it_mkProd_or_LetIn (subst1 mkProp body) (Context.Rel.skipn 1 ctx)
     in
     let sk =
       (* not sure how correct this is *)

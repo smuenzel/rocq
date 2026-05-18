@@ -63,7 +63,7 @@ let compute_new_princ_type_from_rel env rel_to_fun sorts princ_type =
       decompose_prod_decls (EConstr.Unsafe.to_constr (RelDecl.get_type decl))
     in
     let real_args =
-      if princ_type_info.indarg_in_concl then Context.Rel.to_list args |> List.tl |> Context.Rel.of_list else args
+      if princ_type_info.indarg_in_concl then Context.Rel.skipn 1 args else args
     in
     let na = map_annot Nameops.Name.get_id (Context.Rel.Declaration.get_annot decl) in
     let na = EConstr.Unsafe.to_binder_annot na in
