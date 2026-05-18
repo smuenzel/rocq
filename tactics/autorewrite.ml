@@ -285,10 +285,10 @@ let filtering env sigma ctx cv_pb c1 c2 =
 let align_prod_letin sigma c a =
   let (lc,_) = EConstr.decompose_prod_decls sigma c in
   let (l,a) = EConstr.decompose_prod_decls sigma a in
-  let lc = List.length lc in
-  let n = List.length l in
+  let lc = Context.Rel.length lc in
+  let n = Context.Rel.length l in
   if n < lc then invalid_arg "align_prod_letin";
-  let l1 = CList.firstn lc l in
+  let l1 = Context.Rel.firstn lc l in
   n - lc, EConstr.it_mkProd_or_LetIn a l1
 
   let decomp env pat = match pat_of_constr env pat with

@@ -78,13 +78,14 @@ type telescope = {
 }
 
 let telescope env sigma ctx =
+  let ctx = Context.Rel.to_list ctx in
   let ctx, _ = List.fold_right_map (fun d env ->
       let s = Retyping.get_sort_quality_of env sigma (RelDecl.get_type d) in
       let env = EConstr.push_rel d env in
       (d, s), env) ctx env
   in
   let sigma, telescope_type, letcontext, telescope_value = telescope sigma ctx in
-  sigma, letcontext, { telescope_type; telescope_value }
+  sigma, Context.Rel.of_list letcontext, { telescope_type; telescope_value }
 
 (****************************************************)
 (** Closure of a term according to its dependencies *)

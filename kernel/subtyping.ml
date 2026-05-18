@@ -189,7 +189,7 @@ let check_inductive (cst, ustate) trace env mp1 l info1 mp2 mib2 subst1 subst2 r
         assert (Int.equal (Array.length p2.mind_user_lc) 1);
         let get_proj_names p =
           (* can nparamdecls depend on which mib we look at? *)
-          let nparamdecls = List.length mib1.mind_params_ctxt in
+          let nparamdecls = Context.Rel.length mib1.mind_params_ctxt in
           let names = names_prod_letin (p.mind_user_lc.(0)) in
           snd (List.chop nparamdecls names)
         in

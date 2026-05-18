@@ -539,7 +539,7 @@ let abs_evars_pirrel env sigma0 (sigma, c0) =
     let evs = Evarutil.undefined_evars_of_term sigma t in
     let t_evplist = List.filter (fun (k,_) -> Intset.mem k evs) evplist in
     let ctx_t = loopP t_evplist [] 1 t_evplist in
-    let t = EConstr.it_mkProd_or_LetIn (get t_evplist 1 t) ctx_t in
+    let t = EConstr.it_mkProd_or_LetIn (get t_evplist 1 t) (Context.Rel.of_list ctx_t) in
     let t = get evlist (i - 1) t in
     let extra_args = List.rev_map (fun (k,_) -> mkRel (fst (lookup k i evlist))) t_evplist in
     let c = if extra_args = [] then c else app extra_args 1 c in
@@ -974,7 +974,7 @@ let rec intro_anon () =
   Proofview.Goal.enter begin fun gl ->
   let sigma = Proofview.Goal.sigma gl in
   let concl = Proofview.Goal.concl gl in
-  let d = List.hd (fst (EConstr.decompose_prod_n_decls sigma 1 concl)) in
+  let d = List.hd (Context.Rel.to_list (fst (EConstr.decompose_prod_n_decls sigma 1 concl))) in
   Proofview.tclORELSE (anontac d)
     (fun (err0, info) -> Proofview.tclORELSE
         (Tactics.red_in_concl <*> intro_anon ()) (fun _ -> Proofview.tclZERO ~info err0))

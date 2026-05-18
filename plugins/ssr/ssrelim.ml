@@ -40,8 +40,8 @@ let analyze_eliminator elimty env sigma =
   | AtomicType (hd, args) when isRel sigma hd ->
     ctx, destRel sigma hd, not (Vars.noccurn sigma 1 t), Array.length args, t
   | CastType (t, _) -> loop ctx t
-  | ProdType (x, ty, t) -> loop (RelDecl.LocalAssum (x, ty) :: ctx) t
-  | LetInType (x,b,ty,t) -> loop (RelDecl.LocalDef (x, b, ty) :: ctx) (Vars.subst1 b t)
+  | ProdType (x, ty, t) -> loop (Context.Rel.add (RelDecl.LocalAssum (x, ty)) ctx) t
+  | LetInType (x,b,ty,t) -> loop (Context.Rel.add (RelDecl.LocalDef (x, b, ty)) ctx) (Vars.subst1 b t)
   | _ ->
     let env' = push_rel_context ctx env in
     let t' = Reductionops.whd_all env' sigma t in
@@ -49,7 +49,7 @@ let analyze_eliminator elimty env sigma =
       errorstrm Pp.(str"The eliminator has the wrong shape."++spc()++
       str"A (applied) bound variable was expected as the conclusion of "++
       str"the eliminator's"++Pp.cut()++str"type:"++spc()++pr_econstr_env env' sigma elimty) in
-  let ctx, pred_id, elim_is_dep, n_pred_args,concl = loop [] elimty in
+  let ctx, pred_id, elim_is_dep, n_pred_args,concl = loop Context.Rel.empty elimty in
   let n_elim_args = Context.Rel.nhyps ctx in
   let is_rec_elim =
      let count_occurn n term =
@@ -69,6 +69,7 @@ let analyze_eliminator elimty env sigma =
   (ctx,concl)
 
 let subgoals_tys sigma (relctx, concl) =
+  let relctx = Context.Rel.to_list relctx in
   let rec aux cur_depth acc = function
     | hd :: rest ->
         let ty = Context.Rel.Declaration.get_type hd in
@@ -400,7 +401,7 @@ let generate_pred env sigma0 ~concl patterns predty eqid is_rec deps elim_args n
       sigma, concl, gen_eq_tac, clr
   | _ -> sigma, concl, Tacticals.tclIDTAC, clr in
   let mk_lam t r = EConstr.mkLambda_or_LetIn r t in
-  let concl = List.fold_left mk_lam concl pred_rctx in
+  let concl = List.fold_left mk_lam concl (Context.Rel.to_list pred_rctx) in
   let sigma, concl =
     if eqid <> None && is_rec then
       let sigma, concls = Typing.type_of env sigma concl in
@@ -500,7 +501,7 @@ let ssrelim ?(is_case=false) deps what ?elim eqid elim_intro_tac =
   let seed =
     Array.map (fun ty ->
     let ctx,_ = EConstr.decompose_prod_decls sigma ty in
-    CList.rev_map Context.Rel.Declaration.get_name ctx) seed in
+    CList.rev_map Context.Rel.Declaration.get_name (Context.Rel.to_list ctx)) seed in
 
   let elim_tac =
     Tacticals.tclTHENLIST [
@@ -527,10 +528,10 @@ let revtoptac n0 =
   let env = Proofview.Goal.env gl in
   let n = nb_prod sigma concl - n0 in
   let dc, cl = EConstr.decompose_prod_n_decls sigma n concl in
-  let ty = EConstr.it_mkProd_or_LetIn cl (List.rev dc) in
-  let dc' = dc @ [Context.Rel.Declaration.LocalAssum(make_annot (Name rev_id) EConstr.ERelevance.relevant, ty)] in
+  let ty = EConstr.it_mkProd_or_LetIn cl (Context.Rel.rev dc) in
+  let dc' = Context.Rel.to_list dc @ [Context.Rel.Declaration.LocalAssum(make_annot (Name rev_id) EConstr.ERelevance.relevant, ty)] in
   Refine.refine ~typecheck:true begin fun sigma ->
-    let f = EConstr.it_mkLambda_or_LetIn (mkEtaApp (EConstr.mkRel (n + 1)) (-n) 1) dc' in
+    let f = EConstr.it_mkLambda_or_LetIn (mkEtaApp (EConstr.mkRel (n + 1)) (-n) 1) (Context.Rel.of_list dc') in
     let sigma, ev = Evarutil.new_evar env sigma ty in
     sigma, (EConstr.mkApp (f, [|ev|]))
   end

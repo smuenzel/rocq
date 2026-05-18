@@ -138,11 +138,30 @@ sig
       Outer-most declarations are at the end of the list. *)
   type ('constr, 'types, 'r) pt (* = ('constr, 'types, 'r) Declaration.pt list *)
 
+  (** Conversion to and from the underlying list representation. *)
+  val to_list : ('c, 't, 'r) pt -> ('c, 't, 'r) Declaration.pt list
+  val of_list : ('c, 't, 'r) Declaration.pt list -> ('c, 't, 'r) pt
+
   (** empty rel-context *)
   val empty : ('c, 't, 'r) pt
 
+  (** Check whether a rel-context is empty *)
+  val is_empty : ('c, 't, 'r) pt -> bool
+
   (** Return a new rel-context enriched by with a given inner-most declaration. *)
   val add : ('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Concatenate two rel-contexts: [append Γ1 Γ2] where Γ1 is innermost. *)
+  val append : ('c, 't, 'r) pt -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Reverse the order of declarations. *)
+  val rev : ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Return the first [n] (innermost) declarations. *)
+  val firstn : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Skip the first [n] (innermost) declarations. *)
+  val skipn : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
 
   (** Return the number of {e local declarations} in a given rel-context. *)
   val length : ('c, 't, 'r) pt -> int

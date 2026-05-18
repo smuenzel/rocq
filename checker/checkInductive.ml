@@ -27,7 +27,7 @@ let template_univ_entry {template_context; template_defaults=default_univs; _} =
 
 let to_entry mind (mb:mutual_inductive_body) : Entries.mutual_inductive_entry =
   let open Entries in
-  let nparams = List.length mb.mind_params_ctxt in (* include letins *)
+  let nparams = Context.Rel.length mb.mind_params_ctxt in (* include letins *)
   let mind_entry_record =
     (* NB declarations support blocks with some records and some
        non-records, but not yet entries *)
@@ -71,7 +71,7 @@ let to_entry mind (mb:mutual_inductive_body) : Entries.mutual_inductive_entry =
           fix_params (d :: acc) params template
         | _ :: _, [] | [], _ :: _ -> assert false
       in
-      fix_params [] (List.rev mb.mind_params_ctxt) template.template_param_arguments
+      Context.Rel.of_list (fix_params [] (Context.Rel.to_list (Context.Rel.rev mb.mind_params_ctxt)) template.template_param_arguments)
   in
   let mind_entry_inds = Array.map_to_list (fun ind ->
       let mind_entry_arity =
@@ -82,7 +82,7 @@ let to_entry mind (mb:mutual_inductive_body) : Entries.mutual_inductive_entry =
           arity
         | Some template ->
           let ctx = ind.mind_arity_ctxt in
-          let ctx = List.firstn (List.length ctx - nparams) ctx in
+          let ctx = Context.Rel.firstn (Context.Rel.length ctx - nparams) ctx in
           Term.mkArity (ctx, template.template_concl)
       in
       {

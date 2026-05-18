@@ -254,7 +254,7 @@ let pad_to_inductive ist glob = Goal.enter_one ~__LOC__ begin fun goal ->
   let ctx, i = Reductionops.whd_decompose_prod env sigma term_ty in
   let rel_ctx =
     List.map (fun (a,b) -> Context.Rel.Declaration.LocalAssum(a,b)) ctx in
-  if not (Ssrcommon.isAppInd (EConstr.push_rel_context rel_ctx env) sigma i)
+  if not (Ssrcommon.isAppInd (EConstr.push_rel_context (Context.Rel.of_list rel_ctx) env) sigma i)
   then Tacticals.tclZEROMSG Pp.(str"not an inductive")
   else tclUNIT (mkGApp glob (mkGHoles (List.length ctx)))
        >>= tclADD_CLEAR_IF_ID ot

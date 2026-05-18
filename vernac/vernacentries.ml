@@ -202,9 +202,9 @@ let show_intro ~proof all =
     if all then
       let lid = Tactics.find_intro_names env sigma l in
       hov 0 (prlist_with_sep  spc Id.print lid)
-    else if not (List.is_empty l) then
-      let n = List.last l in
-      Id.print (List.hd (Tactics.find_intro_names env sigma [n]))
+    else if Context.Rel.length l <> 0 then
+      let n = List.last (Context.Rel.to_list l) in
+      Id.print (List.hd (Tactics.find_intro_names env sigma (Context.Rel.of_list [n])))
     else mt ()
   end else mt ()
 

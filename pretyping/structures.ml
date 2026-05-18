@@ -237,7 +237,7 @@ let compute_canonical_projections env sigma ~warn (gref,ind) =
     | GlobRef.ConstructRef _ | GlobRef.IndRef _ -> assert false
   in
   let sign,t = Reduction.whd_decompose_lambda env c in
-  let o_TABS = List.rev_map Context.Rel.Declaration.get_type sign in
+  let o_TABS = List.rev_map Context.Rel.Declaration.get_type (Context.Rel.to_list sign) in
   let args = snd (decompose_app_list t) in
   let { Structure.nparams = p; projections = lpj } =
     Structure.find env ind in

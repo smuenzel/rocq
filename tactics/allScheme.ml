@@ -20,8 +20,8 @@ open Context.Rel.Declaration
 
 (** Generalize parameters for template and univ poly, and split uniform and non-uniform parameters *)
 let split_uparams_nuparams mib params =
-  let (uparams, nuparams) = Context.Rel.chop_nhyps mib.mind_nparams_rec (List.rev params) in
-  (List.rev uparams, List.rev nuparams)
+  let (uparams, nuparams) = Context.Rel.chop_nhyps mib.mind_nparams_rec (Context.Rel.rev params) in
+  (Context.Rel.rev uparams, Context.Rel.rev nuparams)
 
 (** {6 Strictly Positive Uniform Parameters } *)
 
@@ -36,8 +36,7 @@ let andl_array f default ar =
 (** Check which uniform parameters are arity, unfolding Let-ins, and returns
     the updated environment and the initial value of strictly positivity     *)
 let init_value env uparams =
-  let rec aux env (tel : Constr.rel_context) =
-    match tel with
+  let rec aux env = function
     | [] -> (env, [])
     | decl::tel ->
       match get_value decl with
@@ -47,11 +46,11 @@ let init_value env uparams =
           let (env, init_value) = aux (push_rel decl env) tel in
           (env, Reduction.is_arity env (get_type decl) :: init_value)
     in
-    aux env (List.rev uparams)
+    aux env (List.rev (Context.Rel.to_list uparams))
 
 (** Check if the uniform parameters appear in a term *)
 let check_strpos env uparams t =
-  let nenv = List.length @@ Environ.rel_context env in
+  let nenv = Context.Rel.length @@ Environ.rel_context env in
   let rec aux i tel =
     match tel with
     | [] -> []
@@ -60,7 +59,7 @@ let check_strpos env uparams t =
       | Some _ -> aux (i+1) tel
       | None   -> noccur_between (nenv - i) 1 t :: aux (i+1) tel
   in
-  aux 0 (List.rev uparams)
+  aux 0 (List.rev (Context.Rel.to_list uparams))
 
 (** Check if the uniform parameters appear in a context  *)
 let check_strpos_context env uparams default cxt =
@@ -89,14 +88,14 @@ end
 let rec compute_params_rec_strpos_arg cache env kn uparams nparams_rec nparams init_value arg =
   (* strictly positive uniform parameters do not appear on the left of an arrow *)
   let (local_vars, hd) = Reduction.whd_decompose_prod_decls env arg in
-  let (env, strpos_local) = check_strpos_context env uparams init_value local_vars in
+  let (env, strpos_local) = check_strpos_context env uparams init_value (Context.Rel.to_list local_vars) in
   (* check the head *)
   let (hd, inst_args) = decompose_app hd in
   let strpos_hd =
     match kind hd with
     | Rel k ->
         (* Check if it is the inductive *)
-        if List.length (Environ.rel_context env) < k then
+        if Context.Rel.length (Environ.rel_context env) < k then
         (* If it is the inductive, then they should not appear in the instantiation
         of the non-uniform parameters and indices of the inductive type being defined *)
           let (_, iargs) = Array.chop nparams_rec inst_args in
@@ -117,9 +116,10 @@ let rec compute_params_rec_strpos_arg cache env kn uparams nparams_rec nparams i
           let mib_nested_strpos = compute_params_rec_strpos cache env kn_nested mib_nested in
           let (inst_uparams, inst_nuparams_indices) =
             Array.chop mib_nested.mind_nparams_rec inst_args in
-          let uparams_nested = List.rev @@ fst @@
-                Context.Rel.chop_nhyps mib_nested.mind_nparams_rec @@
-                List.rev mib_nested.mind_params_ctxt in
+          let uparams_nested =
+            let rev_params = Context.Rel.rev mib_nested.mind_params_ctxt in
+            let (uparams_pt, _) = Context.Rel.chop_nhyps mib_nested.mind_nparams_rec rev_params in
+            uparams_pt in
           let inst_uparams = Termops.eta_expand_instantiation env inst_uparams uparams_nested in
           (* - appear strictly positively in the instantiation of the uniform parameters
                that are strictly postive themselves
@@ -196,18 +196,20 @@ and compute_params_rec_strpos cache env kn mib =
   let env = set_rel_context_val empty_rel_context_val env in
   (* compute the data expected *)
   let inds = Array.map (fun ind ->
-      let (indices, _) = List.chop (List.length ind.mind_arity_ctxt - mib.mind_nparams) ind.mind_arity_ctxt in
+      let (indices, _) = List.chop (Context.Rel.length ind.mind_arity_ctxt - mib.mind_nparams) (Context.Rel.to_list ind.mind_arity_ctxt) in
       let ctors = Array.map (fun (args, hd) ->
-                      let (args,_) = List.chop (List.length args - mib.mind_nparams) args in
+                      let args = Context.Rel.to_list args in
+                      let nargs = List.length args - mib.mind_nparams in
+                      let (args,_) = List.chop nargs args in
                       (args, hd)
                     ) ind.mind_nf_lc
                   in
       (indices, ctors)
     ) mib.mind_packets
   in
-  let (uparams, nuparams) = map_pair List.rev @@ Context.Rel.chop_nhyps mib.mind_nparams_rec @@
-                            List.rev mib.mind_params_ctxt in
-  let ans = compute_params_rec_strpos_aux cache env kn uparams nuparams mib.mind_nparams_rec mib.mind_nparams inds in
+  let (uparams, nuparams) = map_pair Context.Rel.rev @@ Context.Rel.chop_nhyps mib.mind_nparams_rec @@
+                            Context.Rel.rev mib.mind_params_ctxt in
+  let ans = compute_params_rec_strpos_aux cache env kn uparams (Context.Rel.to_list nuparams) mib.mind_nparams_rec mib.mind_nparams inds in
   let () = cache.Cache.uniform <- Mindmap_env.add kn ans cache.Cache.uniform in
   ans
 | Some unf -> unf
@@ -251,7 +253,7 @@ let rec compute_user_strpos_aux user_names allowed_uparams strpos =
 
 let compute_user_strpos mib user_id default_strpos =
   let user_names = List.map (fun i -> Name i) user_id in
-  let uparams = fst @@ split_uparams_nuparams mib mib.mind_params_ctxt in
+  let uparams = Context.Rel.to_list (fst @@ split_uparams_nuparams mib mib.mind_params_ctxt) in
   let uparams_decl = List.filter is_local_assum uparams in
   let uparams_decl_name = List.map get_name uparams_decl in
   let allowed_uparams = List.map (fun (name, i) -> if i then name else Anonymous)
@@ -503,7 +505,7 @@ let view_argument kn mib key_uparams strpos t =
         let uparam_type =  mkType (Univ.Universe.make (Univ.Level.var 0)) in
         assert (Array.length iargs = 1);
         return @@ (cxt, ArgIsNested (GlobRef.ConstRef c, [true],
-                          [LocalAssum (uparam_annot, uparam_type)], iargs, [||]))
+                          Context.Rel.of_list [LocalAssum (uparam_annot, uparam_type)], iargs, [||]))
       else return @@ (cxt, ArgIsCst)
   | _ -> return @@ (cxt, ArgIsCst)
 
@@ -600,7 +602,7 @@ let is_nested_ind kn mib ind uparams nuparams strpos : bool t =
   Array.exists (fun ctor ->
       snd @@ run_state s sigma @@
       let* (args, _) = get_args mib EInstance.empty ctor in
-      fold_left_state (fun a l -> a::l) args (fun _ arg cc ->
+      fold_left_state (fun a l -> a::l) (Context.Rel.to_list args) (fun _ arg cc ->
           let* arg_is_nested = is_nested_arg kn mib key_uparams strpos (get_type arg) in
           let@ key_arg  = add_decl Old naming_id arg in
           let* b = cc key_arg in
@@ -773,7 +775,7 @@ let add_inductive kn u mib return_sorts uparams strpos fresh_sorts nuparams cc =
       let* ind_type = gen_all_type kn pos_ind u mib uparams strpos fresh_sorts nuparams return_sort in
       return (LocalAssum (make_annot Anonymous ind_rev, ind_type))
     ) mib.mind_packets return_sorts in
-  add_context Fresh naming_id (List.rev @@ Array.to_list cxt) cc
+  add_context Fresh naming_id (Context.Rel.of_list (List.rev @@ Array.to_list cxt)) cc
 
 
 (** {7 Generate the Type of the New Constructors } *)
@@ -930,11 +932,11 @@ let generate_all_aux suffix kn u sub_temp mib uparams strpos nuparams =
   let* return_sorts = compute_return_sort kn u sub_temp mib uparams nuparams strpos fresh_sorts_ql in
   let fresh_sorts = List.map (fun (a,b) -> ESorts.make @@ Sorts.vsort a b) fresh_sorts_ql in
   (*uparams + preds, nuparams and recover the context of parameters *)
-  let@ key_inds = add_inductive kn u mib (Array.map snd return_sorts) uparams strpos fresh_sorts nuparams in
-  let@ key_up = context_uparams_preds uparams strpos fresh_sorts in
+  let@ key_inds = add_inductive kn u mib (Array.map snd return_sorts) (Context.Rel.to_list uparams) strpos fresh_sorts nuparams in
+  let@ key_up = context_uparams_preds (Context.Rel.to_list uparams) strpos fresh_sorts in
   let@ key_nuparams = add_context_nuparams naming_id nuparams in
   let* current_context = get_context in
-  let ctxt_params = fst @@ List.chop (List.length current_context - Array.length mib.mind_packets) current_context in
+  let ctxt_params = fst @@ List.chop (Context.Rel.length current_context - Array.length mib.mind_packets) (Context.Rel.to_list current_context) in
   (* create the inductive body *)
   let* ind_bodies = array_mapi (fun pos_ind ind ->
         gen_all_one_ind suffix kn pos_ind ind u mib return_sorts key_inds key_up strpos key_nuparams
@@ -962,7 +964,7 @@ let generate_all_aux suffix kn u sub_temp mib uparams strpos nuparams =
     {
       mind_entry_record = None;
       mind_entry_finite = mib.mind_finite;
-      mind_entry_params = EConstr.to_rel_context sigma ctxt_params ;
+      mind_entry_params = EConstr.to_rel_context sigma (Context.Rel.of_list ctxt_params);
       mind_entry_inds = Array.to_list ind_bodies;
       mind_entry_universes = Polymorphic_ind_entry uctx;
       mind_entry_variance = Some (Array.make ulen None);
@@ -1123,7 +1125,7 @@ let generate_all_theorem_aux kn kn_nested focus u mib uparams strpos nuparams : 
 let generate_all_theorem env sigma kn kn_nested focus u mib strpos =
   let (sigma, uparams, nuparams, _) = get_params_sep sigma mib u in
   dbg Pp.(fun () -> str "strpos = " ++ prlist_with_sep (fun () -> str ", ") bool strpos);
-  let (sigma, tm) = run env sigma @@ generate_all_theorem_aux kn kn_nested focus u mib uparams strpos nuparams in
+  let (sigma, tm) = run env sigma @@ generate_all_theorem_aux kn kn_nested focus u mib (Context.Rel.to_list uparams) strpos nuparams in
   dbg Pp.(fun () -> str "All Theorem = " ++ Termops.Internal.print_constr_env env sigma tm ++ fnl ());
   dbg Pp.(fun () -> str "UState = " ++ UState.pr (Evd.ustate sigma) ++ fnl ());
   (sigma, tm)

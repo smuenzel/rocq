@@ -102,7 +102,7 @@ let match_with_one_constructor env sigma style onlybinary allow_rec t =
       then
         if is_strict_conjunction style (* strict conjunction *) then
           let (ctx, _) = mip.mind_nf_lc.(0) in
-          let ctx = List.skipn (Context.Rel.length mib.mind_params_ctxt) (List.rev ctx) in
+          let ctx = Context.Rel.to_list (Context.Rel.skipn (Context.Rel.length mib.mind_params_ctxt) (Context.Rel.rev ctx)) in
           if
             (* Constructor has a type of the form
               c : forall (a_0 ... a_n : Type) (x_0 : A_0) ... (x_n : A_n). T **)
@@ -119,7 +119,7 @@ let match_with_one_constructor env sigma style onlybinary allow_rec t =
           let cty = EConstr.of_constr (Term.it_mkProd_or_LetIn cty ctx) in
           let ctyp = whd_beta_prod env sigma
             (Termops.prod_applist_decls sigma (Context.Rel.length mib.mind_params_ctxt) cty args) in
-          let cargs = List.map RelDecl.get_type (EConstr.prod_decls sigma ctyp) in
+          let cargs = List.map RelDecl.get_type (Context.Rel.to_list (EConstr.prod_decls sigma ctyp)) in
           if not (is_lax_conjunction style) || has_nodep_prod env sigma ctyp then
             (* Record or non strict conjunction *)
             Some (hdapp,List.rev cargs)
@@ -162,8 +162,8 @@ let is_tuple env sigma t =
    "Inductive I A1 ... An := C1 (_:A1) | ... | Cn : (_:An)" *)
 
 let test_strict_disjunction (mib, mip) =
-  let n = List.length mib.mind_params_ctxt in
-  let check i (ctx, _) = match List.skipn n (List.rev ctx) with
+  let n = Context.Rel.length mib.mind_params_ctxt in
+  let check i (ctx, _) = match List.skipn n (List.rev (Context.Rel.to_list ctx)) with
   | [LocalAssum (_, c)] -> Constr.isRel c && Int.equal (Constr.destRel c) (n - i)
   | _ -> false
   in

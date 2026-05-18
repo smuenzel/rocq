@@ -70,7 +70,7 @@ let get_new_id avoid id =
 open Reduction
 
 let print_params env sigma params =
-  if List.is_empty params then mt ()
+  if Context.Rel.length params = 0 then mt ()
   else Printer.pr_rel_context env sigma params ++ brk(1,2)
 
 let print_constructors envpar sigma names types =

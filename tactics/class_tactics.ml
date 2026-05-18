@@ -261,7 +261,7 @@ let rec e_trivial_fail_db db_list local_db secvars =
 
 and e_my_find_search db_list local_db secvars hdc complete env sigma concl0 =
   let prods, concl = EConstr.decompose_prod_decls sigma concl0 in
-  let nprods = List.length prods in
+  let nprods = Context.Rel.length prods in
   let allowed_evars =
     match hdc with
     | Some (hd,_) ->

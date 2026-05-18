@@ -303,13 +303,13 @@ and traverse_inductive access (curr, data, ax2ty) mind obj =
      let mib = lookup_mind mind in
      (* Collects references of parameters *)
      let param_ctx = mib.mind_params_ctxt in
-     let nparam = List.length param_ctx in
+     let nparam = Context.Rel.length param_ctx in
      let accu = traverse_context access obj Context.Rel.empty accu param_ctx in
      (* For each inductive, collects references in their arity and in the type
         of constructors*)
      let (contents, data, ax2ty) = Array.fold_left (fun accu oib ->
          let arity_wo_param =
-           List.rev (List.skipn nparam (List.rev oib.mind_arity_ctxt))
+           Context.Rel.rev (Context.Rel.skipn nparam (Context.Rel.rev oib.mind_arity_ctxt))
          in
          let accu =
            traverse_context
@@ -366,7 +366,7 @@ let uses_uip mib =
       Option.is_empty mip.mind_squashed
       && mip.mind_relevance == Sorts.Irrelevant
       && Array.length mip.mind_nf_lc = 1
-      && List.length (fst mip.mind_nf_lc.(0)) = List.length mib.mind_params_ctxt)
+      && Context.Rel.length (fst mip.mind_nf_lc.(0)) = Context.Rel.length mib.mind_params_ctxt)
     mib.mind_packets
 
 let assumptions ?(add_opaque=false) ?(add_transparent=false) access st grs =

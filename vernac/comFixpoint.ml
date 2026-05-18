@@ -161,7 +161,7 @@ let encapsulate_Fix_sub env sigma recname ctx body ccl (extradecl, rel, relargty
   let open Combinators in
   let sigma, letbinders, {telescope_type = tuple_type; telescope_value = tuple_value} =
     telescope env sigma ctx in
-  let tupled_ctx = letbinders @ [LocalAssum (make_annot (Name argname) ERelevance.relevant, tuple_type)] in
+  let tupled_ctx = Context.Rel.append letbinders (Context.Rel.of_list [LocalAssum (make_annot (Name argname) ERelevance.relevant, tuple_type)]) in
   (* The function measure has type [tuple_type -> relargty] *)
   let measure = it_mkLambda_or_LetIn measure_body tupled_ctx in
   (* The relation wf_rel_measure is [fun x y => rel (measure x) (measure y)] *)
@@ -202,11 +202,11 @@ let encapsulate_Fix_sub env sigma recname ctx body ccl (extradecl, rel, relargty
     let ccl_on_smaller_arg = Vars.substl [projection] (it_mkLambda_or_LetIn ccl letbinders) in
     (* substitute the projection of wfarg for something,
              now ccl_let is in wfarg :: arg *)
-    let ccl_on_smaller_arg = it_mkProd_or_LetIn ccl_on_smaller_arg [wfa] in
+    let ccl_on_smaller_arg = it_mkProd_or_LetIn ccl_on_smaller_arg (Context.Rel.of_list [wfa]) in
     let recname' = Nameops.add_suffix recname "'" in
     let smaller_arg = RelDecl.LocalAssum (make_annot (Name recname') ERelevance.relevant,
                                           ccl_on_smaller_arg) in
-    sigma, Vars.lift_rel_context 1 letbinders @ smaller_arg :: [arg] in
+    sigma, Context.Rel.append (Vars.lift_rel_context 1 letbinders) (Context.Rel.of_list [smaller_arg; arg]) in
   let sigma, curryfier_body, curryfier_ty =
     (* In tupled_context where the function argument of Fix_sub (argid'), is inserted,
        that is, all expanded: [recarg;argid';letbinders], build the curryfying combinator
@@ -220,12 +220,12 @@ let encapsulate_Fix_sub env sigma recname ctx body ccl (extradecl, rel, relargty
       let arg = mkApp (intro, [| tuple_type; wfpred; Vars.lift 1 tuple_value; mkRel 1 |]) in
       (* Build the body of combinator *)
       mkApp (mkRel (2 * len + 2 (* recproof + orig binders + current binders *)), [| arg |]) in
-    let extended_ctx = extradecl :: ctx in
+    let extended_ctx = Context.Rel.add extradecl ctx in
     let body = it_mkLambda_or_LetIn app extended_ctx in
     let ty = it_mkProd_or_LetIn (Vars.lift 1 ccl) extended_ctx in
     sigma, body, ty in
   (* Rephrase the body of the fixpoint as dependent in the telescope *)
-  let body_ctx = RelDecl.LocalDef (make_annot (Name recname) ERelevance.relevant, curryfier_body, curryfier_ty) :: fix_sub_F_sub_ctx in
+  let body_ctx = Context.Rel.add (RelDecl.LocalDef (make_annot (Name recname) ERelevance.relevant, curryfier_body, curryfier_ty)) fix_sub_F_sub_ctx in
   let intern_body_lam = it_mkLambda_or_LetIn body body_ctx in
   (* Instantiate the argument Fix_sub_F of Fix_sub with the body of the fixpoint *)
   let sigma, fix_sub = Typing.solve_evars env sigma fix_sub in
@@ -374,7 +374,7 @@ let build_fix_type sigma ctx ccl (_, extradecl) =
 let build_dummy_fix_type sigma ctx ccl (_, extradecl) =
   (* Hack: the extra declarations are smashed to a dummy non-dependent
      so as not to contribute to the computation of implicit arguments *)
-  let ccl = it_mkProd_or_LetIn (Vars.lift (Context.Rel.length extradecl) ccl) (List.map (RelDecl.map_type (fun _ -> mkProp)) extradecl) in
+  let ccl = it_mkProd_or_LetIn (Vars.lift (Context.Rel.length extradecl) ccl) (Context.Rel.of_list (List.map (RelDecl.map_type (fun _ -> mkProp)) (Context.Rel.to_list extradecl))) in
   Evarutil.nf_evar sigma (it_mkProd_or_LetIn ccl ctx)
 
 (* Wellfounded definition *)
@@ -447,7 +447,8 @@ let interp_mutual_definition env ~program_mode ~poly ~function_mode rec_order fi
   let fixwfs, possible_guard = interp_rec_annot ~program_mode ~function_mode env sigma fixl fixctxs fixccls rec_order in
   let sigma, (fixextras, fixwfs, fixwfimps) =
     on_snd List.split3 @@ (List.fold_left4_map (interp_wf ~program_mode env) sigma fixnames fixctxs fixccls fixwfs) in
-  let fixtypes = List.map3 (build_fix_type sigma) fixctxs fixccls fixextras in
+  let fixtypes = List.map3 (build_fix_type sigma) fixctxs fixccls
+    (List.map (fun (b, l) -> (b, Context.Rel.of_list l)) fixextras) in
   let sigma, rec_sign =
     List.fold_left4
       (fun (sigma, rec_sign) id r t (_,extradecl) ->
@@ -462,7 +463,8 @@ let interp_mutual_definition env ~program_mode ~poly ~function_mode rec_order fi
   let fixntns = List.map_append (fun { Vernacexpr.notations } -> List.map Metasyntax.prepare_where_notation notations ) fixl in
   let sigma, fixdefs =
     let force = List.map (fun (_,extra) -> Id.Set.of_list (List.map_filter (fun d -> Nameops.Name.to_option (RelDecl.get_name d)) extra)) fixextras in
-    let dummy_fixtypes = List.map3 (build_dummy_fix_type sigma) fixctxs fixccls fixextras in
+    let dummy_fixtypes = List.map3 (build_dummy_fix_type sigma) fixctxs fixccls
+      (List.map (fun (b, l) -> (b, Context.Rel.of_list l)) fixextras) in
     let impls = compute_internalization_env env sigma ~force Recursive fixnames dummy_fixtypes fixrecimps in
     Metasyntax.with_syntax_protection (fun () ->
       List.iter (Metasyntax.set_notation_for_interpretation env impls) fixntns;
@@ -472,8 +474,8 @@ let interp_mutual_definition env ~program_mode ~poly ~function_mode rec_order fi
            let env', ctx =
              if after then env, List.map NamedDecl.to_rel_decl rec_sign @ ctx
              else push_named_context rec_sign env, extradecl@ctx in
-           interp_fix_body ~program_mode env' ctx sigma impls body (Vars.lift (Context.Rel.length extradecl) ccl))
-        sigma fixctximpenvs fixextras fixctxs fixl fixccls)
+           interp_fix_body ~program_mode env' (Context.Rel.of_list ctx) sigma impls body (Vars.lift (List.length extradecl) ccl))
+        sigma fixctximpenvs fixextras (List.map Context.Rel.to_list fixctxs) fixl fixccls)
       () in
 
   (* Build the fix declaration block *)
@@ -509,7 +511,7 @@ let interp_fixpoint_short rec_order fixpoint_exprl =
 
 let build_recthms {fixnames;fixtypes;fixctxs;fiximps} =
   List.map4 (fun {CAst.v=name; loc} typ ctx impargs ->
-      let args = List.map Context.Rel.Declaration.get_name ctx in
+      let args = List.map Context.Rel.Declaration.get_name (Context.Rel.to_list ctx) in
       Declare.CInfo.make ?loc ~name ~typ ~args ~impargs ()
     ) fixnames fixtypes fixctxs fiximps
 

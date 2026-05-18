@@ -78,12 +78,12 @@ let push_rel ~hypnaming sigma d env =
 
 let push_rel_context ~hypnaming ?(force_names=false) sigma ctx env =
   let open Context.Rel.Declaration in
-  let ctx' = List.Smart.map (map_name (ltac_interp_name env.lvar)) ctx in
+  let ctx' = Context.Rel.of_list (List.Smart.map (map_name (ltac_interp_name env.lvar)) (Context.Rel.to_list ctx)) in
   let ctx' = if force_names then Namegen.name_context env.renamed_env sigma ctx' else ctx' in
   let env = {
     static_env = push_rel_context ctx env.static_env;
     renamed_env = push_rel_context ctx' env.renamed_env;
-    extra = lazy (List.fold_right (fun d acc -> push_rel_decl_to_named_context ~hypnaming:hypnaming sigma d acc) ctx' (Lazy.force env.extra));
+    extra = lazy (List.fold_right (fun d acc -> push_rel_decl_to_named_context ~hypnaming:hypnaming sigma d acc) (Context.Rel.to_list ctx') (Lazy.force env.extra));
     lvar = env.lvar;
     } in
   ctx', env

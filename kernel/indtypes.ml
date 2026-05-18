@@ -122,7 +122,7 @@ let check_correct_par ~chkpos (env,n,ntypes,_) paramdecls ind_index args =
   if Array.length args < nparams then
     raise (IllFormedInd (LocalNotEnoughArgs ind_index));
   let (params,realargs) = Array.chop nparams args in
-  let nparamdecls = List.length paramdecls in
+  let nparamdecls = Context.Rel.length paramdecls in
   let rec check param_index paramdecl_index = function
     | [] -> ()
     | LocalDef _ :: paramdecls ->
@@ -136,7 +136,7 @@ let check_correct_par ~chkpos (env,n,ntypes,_) paramdecls ind_index args =
             let err =
               LocalNonPar (param_index+1, paramdecl_index_in_env, ind_index) in
             raise (IllFormedInd err)
-  in check (nparams-1) (n-nparamdecls) paramdecls;
+  in check (nparams-1) (n-nparamdecls) (Context.Rel.to_list paramdecls);
   if chkpos && not (Array.for_all (noccur_between n ntypes) realargs) then
     failwith_non_pos_vect n ntypes realargs
 
@@ -149,6 +149,7 @@ let compute_rec_par (env,n,_,_) paramsctxt nmr largs =
 if Int.equal nmr 0 then 0 else
 (* start from 0, params will be in reverse order *)
   let (lpar,_) = List.chop nmr largs in
+  let paramsctxt = Context.Rel.to_list paramsctxt in
   let rec find k index =
       function
           ([],_) -> nmr
@@ -443,7 +444,7 @@ let rel_vect n m = Array.init m (fun i -> mkRel(n+m-i))
     a substitution of the form [params, x : ind params] *)
 let compute_projections ind ~nparamargs ~nf_lc ~consnrealdecls =
   let (ctx, _) = nf_lc.(0) in
-  let ctx, paramslet = List.chop consnrealdecls.(0) ctx in
+  let ctx, paramslet = List.chop consnrealdecls.(0) (Context.Rel.to_list ctx) in
   (** We build a substitution smashing the lets in the record parameters so
       that typechecking projections requires just a substitution and not
       matching with a parameter context. *)
@@ -451,7 +452,7 @@ let compute_projections ind ~nparamargs ~nf_lc ~consnrealdecls =
     (* [Ind inst] is typed in context [params-wo-let] *)
     let inst' = rel_vect 0 nparamargs in
     (* {params-wo-let |- subst:params] *)
-    let subst = subst_of_rel_context_instance paramslet inst' in
+    let subst = subst_of_rel_context_instance (Context.Rel.of_list paramslet) inst' in
     (* {params-wo-let, x:Ind inst' |- subst':(params,x:Ind inst)] *)
     let subst = (* For the record parameter: *)
       mkRel 1 :: List.map (lift 1) subst in
@@ -508,7 +509,7 @@ let build_inductive env ~sec_univs names prv univs template variance
     (* Type of constructors in normal form *)
     let nf_lc =
       Array.map (fun (d, b) ->
-        decompose_prod_decls (substl subst (it_mkProd_or_LetIn b (d@paramsctxt))))
+        decompose_prod_decls (substl subst (it_mkProd_or_LetIn b (Context.Rel.append d paramsctxt))))
         splayed_lc in
     let consnrealdecls =
       Array.map (fun (d,_) -> Context.Rel.length d)
@@ -552,7 +553,7 @@ let build_inductive env ~sec_univs names prv univs template variance
         mind_record;
         mind_user_arity = arity.IndTyping.user_arity;
         mind_sort = arity.IndTyping.sort;
-        mind_arity_ctxt = indices @ paramsctxt;
+        mind_arity_ctxt = Context.Rel.append indices paramsctxt;
         mind_nrealargs = Context.Rel.nhyps indices;
         mind_nrealdecls = Context.Rel.length indices;
         mind_squashed = squashed;

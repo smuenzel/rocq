@@ -702,13 +702,13 @@ let empty_scheme =
   {
     elimt = mkProp;
     indref = None;
-    params = [];
+    params = Context.Rel.empty;
     nparams = 0;
-    predicates = [];
+    predicates = Context.Rel.empty;
     npredicates = 0;
-    branches = [];
+    branches = Context.Rel.empty;
     nbranches = 0;
-    args = [];
+    args = Context.Rel.empty;
     nargs = 0;
     indarg = None;
     concl = mkProp;
@@ -773,13 +773,13 @@ let decompose_paramspred_branch_args sigma elimt =
           if not (occur_rel sigma 1 elimt') && isRel sigma hd_tpe
           then cut_noccur elimt' (LocalAssum (nme,tpe)::acc2)
           else let acc3,ccl = decompose_prod_decls sigma elimt in acc2 , acc3 , ccl
-      | App(_, _) | Rel _ -> acc2 , [] , elimt
+      | App(_, _) | Rel _ -> acc2 , Context.Rel.empty , elimt
       | _ -> error_ind_scheme "" in
   let rec cut_occur elimt acc1 =
     match EConstr.kind sigma elimt with
       | Prod(nme,tpe,c) when occur_rel sigma 1 c -> cut_occur c (LocalAssum (nme,tpe)::acc1)
       | Prod(nme,tpe,c) -> let acc2,acc3,ccl = cut_noccur elimt [] in acc1,acc2,acc3,ccl
-      | App(_, _) | Rel _ -> acc1,[],[],elimt
+      | App(_, _) | Rel _ -> acc1,[],Context.Rel.empty,elimt
       | _ -> error_ind_scheme "" in
   let acc1, acc2 , acc3, ccl = cut_occur elimt [] in
   (* Particular treatment when dealing with a dependent empty type elim scheme:
@@ -793,7 +793,7 @@ let decompose_paramspred_branch_args sigma elimt =
     let hyps,ccl = decompose_prod_decls sigma elimt in
     let hd_ccl_pred,_ = decompose_app sigma ccl in
     begin match EConstr.kind sigma hd_ccl_pred with
-      | Rel i  -> let acc3,acc1 = List.chop (i-1) hyps in acc1 , [] , acc3 , ccl
+      | Rel i  -> let acc3,acc1 = List.chop (i-1) (Context.Rel.to_list hyps) in acc1 , [] , Context.Rel.of_list acc3 , ccl
       | _ -> error_ind_scheme ""
     end
   | _ -> acc1, acc2 , acc3, ccl
@@ -832,18 +832,18 @@ let compute_elim_sig sigma elimt =
   let res = { empty_scheme with
     (* This fields are ok: *)
     elimt = elimt; concl = conclusion;
-    predicates = preds; npredicates = List.length preds;
-    branches = branches; nbranches = List.length branches;
+    predicates = Context.Rel.of_list preds; npredicates = List.length preds;
+    branches = Context.Rel.of_list branches; nbranches = List.length branches;
     farg_in_concl = isApp sigma ccl && isApp sigma (last_arg sigma ccl);
-    params = params; nparams = nparams;
+    params = Context.Rel.of_list params; nparams = nparams;
     (* all other fields are unsure at this point. Including these:*)
-    args = args_indargs; nargs = List.length args_indargs; } in
+    args = args_indargs; nargs = Context.Rel.length args_indargs; } in
   (* 1- First see if (f x...) is in the conclusion. *)
   if res.farg_in_concl then res
   (* 2- If no args_indargs (=!res.nargs at this point) then no indarg *)
   else if Int.equal res.nargs 0 then res
   (* 3- Look at last arg: is it the indarg? *)
-  else match List.hd args_indargs with
+  else match List.hd (Context.Rel.to_list args_indargs) with
   | LocalDef (hiname, _, hi) -> error_ind_scheme ""
   | LocalAssum (hiname, hi) ->
     let hi_ind, hi_args = decompose_app sigma hi in
@@ -857,7 +857,7 @@ let compute_elim_sig sigma elimt =
     (* FIXME: these two tests are not enough *)
     if not (hi_is_ind && hi_args_enough) then res (* No indarg *)
     else
-      let ind, indarg, args = match res.args with
+      let ind, indarg, args = match Context.Rel.to_list res.args with
       | [] -> failwith "hd"
       | LocalDef _ :: _ -> error_ind_scheme ""
       | LocalAssum (_, ind) as indarg :: args -> ind, indarg, args
@@ -870,7 +870,7 @@ let compute_elim_sig sigma elimt =
       { res with
         indarg = Some indarg;
         indarg_in_concl = occur_rel sigma 1 ccl;
-        args = args; nargs = res.nargs - 1;
+        args = Context.Rel.of_list args; nargs = res.nargs - 1;
         indref = Some indref;
       }
 
@@ -934,7 +934,7 @@ let compute_scheme_signature evd scheme names_info ind_type_guess =
       | LocalDef _ :: _ -> error_ind_scheme "the branches of"
       | [] -> check_concl is_pred p; []
   in
-  Array.of_list (find_branches 0 (List.rev scheme.branches))
+  Array.of_list (find_branches 0 (Context.Rel.to_list (Context.Rel.rev scheme.branches)))
 
 let compute_case_signature env mind dep names_info =
   let indref = GlobRef.IndRef mind in
@@ -954,7 +954,7 @@ let compute_case_signature env mind dep names_info =
   let (mib, mip) = Inductive.lookup_mind_specif env mind in
   let find_branches k =
     let (ctx, typ) = mip.mind_nf_lc.(k) in
-    let argctx = List.firstn mip.mind_consnrealdecls.(k) ctx in
+    let argctx = Context.Rel.firstn mip.mind_consnrealdecls.(k) ctx in
     let _, args = Constr.decompose_app typ in
     let _, indices = Array.chop mib.mind_nparams args in
     let base =

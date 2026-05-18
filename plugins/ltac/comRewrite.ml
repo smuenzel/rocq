@@ -137,7 +137,7 @@ let proper_projection env sigma r ty =
   let rel_vect n m = Array.init m (fun i -> mkRel(n+m-i)) in
   let ctx, inst = decompose_prod_decls sigma ty in
   let mor, args = destApp sigma inst in
-  let instarg = mkApp (r, rel_vect 0 (List.length ctx)) in
+  let instarg = mkApp (r, rel_vect 0 (Context.Rel.length ctx)) in
   let sigma, proj = Evd.fresh_global env sigma (PropGlobal.proper_proj ()) in
   let app = mkApp (proj,
                   Array.append args [| instarg |]) in

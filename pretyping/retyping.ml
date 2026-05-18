@@ -409,7 +409,7 @@ let sorts_of_context env evc ctxt =
       let env,sorts = aux ctxt in
       let s = get_sort_of env evc (RelDecl.get_type d) in
       (push_rel d env,s::sorts) in
-  snd (aux ctxt)
+  snd (aux (Context.Rel.to_list ctxt))
 
 let expand_projection env sigma pr c args =
   let ty = get_type_of ~lax:true env sigma c in

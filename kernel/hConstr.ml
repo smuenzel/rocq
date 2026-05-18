@@ -463,11 +463,10 @@ and of_constr_aux henv c =
     Array (u,t,def,ty)
 
 and push_rel_context henv ctx =
-  List.fold_right (fun d henv ->
+  Context.Rel.fold_outside (fun d henv ->
       let d = RelDecl.map_constr_het (fun r -> r) (of_constr henv) d in
       push_decl d henv)
-    ctx
-    henv
+    ctx ~init:henv
 
 let dbg = CDebug.create ~name:"hconstr" ()
 

@@ -477,7 +477,7 @@ let should_invert_case env sigma r (ci : Constr.case_info) =
       match Array.length mip.mind_nf_lc with
       | 0 -> true
       | 1 ->
-         List.length (fst mip.mind_nf_lc.(0)) = List.length mib.mind_params_ctxt
+         Context.Rel.length (fst mip.mind_nf_lc.(0)) = Context.Rel.length mib.mind_params_ctxt
       | _ -> false
 end
 (* ************************************* *)
@@ -508,7 +508,7 @@ let make_project env sigma ind pred c branches ps =
   let proj = match EConstr.destRel sigma br with
     | exception Constr.DestKO -> None
     | i ->
-      begin match List.skipn (i-1) ctx with
+      begin match List.skipn (i-1) (Context.Rel.to_list ctx) with
       | exception Failure _ -> None
       | ctx -> match ctx with
         | [] -> None
@@ -518,7 +518,7 @@ let make_project env sigma ind pred c branches ps =
           None
         | LocalAssum _ :: ctx ->
           (* This match is just a projection *)
-          Some (mkProj (Context.Rel.nhyps ctx) c)
+          Some (mkProj (Context.Rel.nhyps (Context.Rel.of_list ctx)) c)
       end
   in
   match proj with
@@ -533,9 +533,9 @@ let make_project env sigma ind pred c branches ps =
            (i + 1, j + 1, LocalDef (na, t, Vars.liftn 1 j ty) :: ctx)
          | LocalDef (na, b, ty) ->
            (i, j + 1, LocalDef (na, Vars.liftn 1 j b, Vars.liftn 1 j ty) :: ctx))
-      ctx (0, 1, [])
+      (Context.Rel.to_list ctx) (0, 1, [])
   in
-  mkLetIn (na, c, ty, it_mkLambda_or_LetIn (Vars.liftn 1 (mip.mind_consnrealdecls.(0) + 1) br) ctx)
+  mkLetIn (na, c, ty, it_mkLambda_or_LetIn (Vars.liftn 1 (mip.mind_consnrealdecls.(0) + 1) br) (Context.Rel.of_list ctx))
 
 let simple_make_case_or_project env sigma ci pred invert c branches =
   let ind = ci.Constr.ci_ind in
@@ -577,13 +577,13 @@ let get_arity env ((ind,u),params) =
       assert (Int.equal nparams mib.mind_nparams_rec);
       snd (Inductive.inductive_nonrec_rec_paramdecls (mib,u))
     end in
-  let parsign = EConstr.of_rel_context parsign in
-  let arproperlength = List.length mip.mind_arity_ctxt - List.length parsign in
-  let arsign,_ = List.chop arproperlength mip.mind_arity_ctxt in
-  let arsign = EConstr.of_rel_context arsign in
-  let subst = subst_of_rel_context_instance_list parsign params in
-  let arsign = Vars.subst_instance_context u arsign in
-  substl_rel_context subst arsign
+  let arproperlength = Context.Rel.length mip.mind_arity_ctxt - Context.Rel.length parsign in
+  let arsign = snd (List.chop arproperlength (Context.Rel.to_list mip.mind_arity_ctxt)) in
+  let parsign_ec = EConstr.of_rel_context parsign in
+  let arsign_ec = EConstr.of_rel_context (Context.Rel.of_list arsign) in
+  let arsign_ec = Vars.subst_instance_context u arsign_ec in
+  let subst = subst_of_rel_context_instance_list parsign_ec params in
+  Context.Rel.of_list (substl_rel_context subst (Context.Rel.to_list arsign_ec))
 
 (* Functions to build standard types related to inductive *)
 let build_dependent_constructor cs =
@@ -594,7 +594,7 @@ let build_dependent_constructor cs =
 
 let build_dependent_inductive env ((ind, params) as indf) =
   let arsign = get_arity env indf in
-  let nrealargs = List.length arsign in
+  let nrealargs = Context.Rel.length arsign in
   applist
     (mkIndU ind,
      (List.map (lift nrealargs) params)@(Context.Rel.instance_list mkRel 0 arsign))
@@ -607,8 +607,8 @@ let make_arity_signature env sigma dep (ind, _ as indf) =
   let anon = make_annot Anonymous r in
   if dep then
     (* We need names everywhere *)
-    Namegen.name_context env sigma
-      ((LocalAssum (anon, build_dependent_inductive env indf)) :: arsign)
+    let arsign_with_self = Context.Rel.add (LocalAssum (anon, build_dependent_inductive env indf)) arsign in
+    Namegen.name_context env sigma arsign_with_self
       (* Costly: would be better to name once for all at definition time *)
   else
     (* No need to enforce names *)
@@ -637,14 +637,15 @@ let compute_projections env (kn, i as ind) =
   let { mind_nparams = nparamargs; mind_params_ctxt = params } = mib in
   let params = EConstr.of_rel_context params in
   let ctx, _ = pkt.mind_nf_lc.(0) in
-  let ctx, paramslet = List.chop pkt.mind_consnrealdecls.(0) ctx in
-  let ctx = EConstr.of_rel_context ctx in
+  let ctx_list = Context.Rel.to_list ctx in
+  let ctx, paramslet = List.chop pkt.mind_consnrealdecls.(0) ctx_list in
+  let ctx = EConstr.of_rel_context (Context.Rel.of_list ctx) in
   (* We build a substitution smashing the lets in the record parameters so
      that typechecking projections requires just a substitution and not
      matching with a parameter context. *)
   let indty =
     (* [ty] = [Ind inst] is typed in context [params] *)
-    let inst = Context.Rel.instance mkRel 0 paramslet in
+    let inst = Context.Rel.instance mkRel 0 (Context.Rel.of_list paramslet) in
     let indu = mkIndU (ind, u) in
     let ty = mkApp (indu, inst) in
     (* [Ind inst] is typed in context [params-wo-let] *)
@@ -687,7 +688,7 @@ let compute_projections env (kn, i as ind) =
         anomaly Pp.(str "Trying to build primitive projections for a non-primitive record")
   in
   let (_, _, pbs, subst) =
-    List.fold_right projections ctx (0, 1, [], [])
+    List.fold_right projections (Context.Rel.to_list ctx) (0, 1, [], [])
   in
   Array.rev_of_list pbs
 

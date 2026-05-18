@@ -32,7 +32,7 @@ let is_rec_info sigma scheme_info =
     let max = min + scheme_info.npredicates in
     Int.Set.exists (fun i -> i >= min && i < max) free_rels_in_br
   in
-  List.fold_left_i test_branche 1 false (List.rev scheme_info.branches)
+  List.fold_left_i test_branche 1 false (List.rev (Context.Rel.to_list scheme_info.branches))
 
 let choose_dest_or_ind scheme_info args =
   Proofview.tclBIND Proofview.tclEVARMAP (fun sigma ->

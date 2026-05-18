@@ -919,7 +919,7 @@ and convert_return_clause mib mip l2r infos e1 e2 l1 l2 u1 u2 pms1 pms2 p1 p2 cu
   let ctx =
     if Int.equal mip.mind_nrealargs mip.mind_nrealdecls then None
     else
-      let ctx, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
+      let ctx, _ = List.chop mip.mind_nrealdecls (Context.Rel.to_list mip.mind_arity_ctxt) in
       let pms1 = inductive_subst mib u1 pms1 in
       let pms2 = inductive_subst mib u2 pms2 in
       let open Context.Rel.Declaration in
@@ -934,7 +934,7 @@ and convert_branches mib mip l2r infos e1 e2 lft1 lft2 u1 u2 pms1 pms2 br1 br2 c
     let ctx =
       if Int.equal mip.mind_consnrealdecls.(i) mip.mind_consnrealargs.(i) then None
       else
-        let ctx, _ = List.chop mip.mind_consnrealdecls.(i) ctx in
+        let ctx, _ = List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list ctx) in
         let ctx = List.map Context.Rel.Declaration.get_value ctx in
         let pms1 = inductive_subst mib u1 pms1 in
         let pms2 = inductive_subst mib u2 pms2 in

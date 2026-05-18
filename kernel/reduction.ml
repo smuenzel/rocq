@@ -192,5 +192,5 @@ let eta_expand ?evars env t ty =
   let d = Context.Rel.nhyps ctxt - Context.Rel.nhyps ctxt' in
   let eta_args = List.rev_map mkRel (List.interval 1 d) in
   let t = Term.applistc (Vars.lift d t) eta_args in
-  let t = Term.it_mkLambda_or_LetIn t (List.firstn d ctxt) in
+  let t = Term.it_mkLambda_or_LetIn t (Context.Rel.firstn d ctxt) in
   Term.it_mkLambda_or_LetIn t ctxt'

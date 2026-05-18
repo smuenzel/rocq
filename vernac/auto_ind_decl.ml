@@ -157,7 +157,7 @@ let get_inductive_deps ~noprop env kn =
       | Float _ | String _ | Array _ -> Termops.fold_constr_with_full_binders env sigma EConstr.push_rel aux env (List.fold_left (aux env) accu a) c
     in
     let fold i accu (constr_ctx,_) =
-      let constr_ctx, _ = List.chop mip.mind_consnrealdecls.(i) constr_ctx in
+      let constr_ctx, _ = List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list constr_ctx) in
       let rec fold env accu = function
         | [] -> env, accu
         | decl::ctx ->
@@ -273,32 +273,32 @@ let push_rec_env_lift recdef env_lift =
 
 let dest_lam_assum_expand env c =
   let ctx, c = Reduction.whd_decompose_lambda_decls env c in
-  if List.is_empty ctx then ctx, c
+  if Context.Rel.length ctx = 0 then ctx, c
   else
     let t = EConstr.Unsafe.to_constr (Retyping.get_type_of (Environ.push_rel_context ctx env) (Evd.from_env env) (EConstr.of_constr c)) in
     let ctx', _ = Reduction.whd_decompose_prod_decls env t in
-    ctx'@ctx, mkApp (lift (Context.Rel.length ctx') c, Context.Rel.instance mkRel 0 ctx')
+    Context.Rel.append ctx' ctx, mkApp (lift (Context.Rel.length ctx') c, Context.Rel.instance mkRel 0 ctx')
 
 let pred_context env ci params u nas =
   let mib, mip = Inductive.lookup_mind_specif env ci.ci_ind in
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let paramsubst = Vars.subst_of_rel_context_instance paramdecl params in
-  let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
+  let realdecls_list, _ = List.chop mip.mind_nrealdecls (Context.Rel.to_list mip.mind_arity_ctxt) in
   let self =
     let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
     let inst = UVars.Instance.(abstract_instance (length u)) in
     mkApp (mkIndU (ci.ci_ind, inst), args)
   in
   let na = Context.make_annot Anonymous mip.mind_relevance in
-  let realdecls = RelDecl.LocalAssum (na, self) :: realdecls in
-  Inductive.instantiate_context u paramsubst nas realdecls
+  let realdecls = RelDecl.LocalAssum (na, self) :: realdecls_list in
+  Inductive.instantiate_context u paramsubst nas (Context.Rel.of_list realdecls)
 
 let branch_context env ci params u nas i =
   let mib, mip = Inductive.lookup_mind_specif env ci.ci_ind in
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let paramsubst = Vars.subst_of_rel_context_instance paramdecl params in
-  let ctx, _ = List.chop mip.mind_consnrealdecls.(i) (fst mip.mind_nf_lc.(i)) in
-  Inductive.instantiate_context u paramsubst nas ctx
+  let ctx, _ = List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list (fst mip.mind_nf_lc.(i))) in
+  Inductive.instantiate_context u paramsubst nas (Context.Rel.of_list ctx)
 
 let build_beq_scheme_deps env kn =
   let inds = get_inductive_deps ~noprop:true env kn in
@@ -454,7 +454,7 @@ let build_beq_scheme env handle kn =
       let p = mkProd (Context.anonR, t, p) in
       let lbr = Array.mapi (fun i (names, t) ->
         let ctx = branch_context env ci pms u names i in
-        let env_lift' = List.fold_right push_env_lift ctx env_lift in
+        let env_lift' = List.fold_right push_env_lift (Context.Rel.to_list ctx) env_lift in
         match translate_type_eq env_lift' na (mkRel 1) t with
         | None -> None
         | Some t_eq -> Some (names, mkLambda (na, t, t_eq))) lbr in
@@ -554,7 +554,7 @@ let build_beq_scheme env handle kn =
 
     | Case (ci, u, pms, ((pnames,p), r), iv, tm, lbr) ->
       let pctx = pred_context env ci pms u pnames in
-      let env_lift_pred = List.fold_right push_env_lift pctx env_lift in
+      let env_lift_pred = List.fold_right push_env_lift (Context.Rel.to_list pctx) env_lift in
       let n = Array.length pnames in
       let c =
         mkCase (ci, u,
@@ -566,7 +566,7 @@ let build_beq_scheme env handle kn =
       let p = translate_type_eq env_lift_pred Context.anonR c p in
       let lbr = Array.mapi (fun i (names, t) ->
         let ctx = branch_context env ci pms u names i in
-        let env_lift' = List.fold_right push_env_lift ctx env_lift in
+        let env_lift' = List.fold_right push_env_lift (Context.Rel.to_list ctx) env_lift in
         match translate_term_eq env_lift' t with
         | None -> None
         | Some t_eq -> Some (names, t_eq)) lbr in
@@ -614,7 +614,7 @@ let build_beq_scheme env handle kn =
      (eq_F : forall G, (forall A, eq A -> eq (G A)) -> nat -> eq (F G)) *)
 
   and translate_context_eq env_lift ctx =
-    let ctx = name_context env_lift.env ctx in
+    let ctx = name_context env_lift.env (Context.Rel.to_list ctx) in
     let (env_lift_ctx,nctx_eq,ctx_with_eq) =
       List.fold_right (fun decl (env_lift,n,ctx) ->
         let env_lift = push_env_lift decl env_lift in
@@ -630,9 +630,9 @@ let build_beq_scheme env handle kn =
            match translate_type_eq env_lift' na (mkRel 1) (lift 1 t) with
            | Some eq_typ -> (set_replicate 1 n env_lift, n, RelDecl.LocalAssum (eqName na,eq_typ) :: ctx)
            | None -> (env_lift, n-1, ctx)
-      ) ctx (env_lift, Context.Rel.length ctx, ctx)
+      ) ctx (env_lift, List.length ctx, ctx)
     in
-    shiftn_env_lift nctx_eq env_lift_ctx, ctx_with_eq
+    shiftn_env_lift nctx_eq env_lift_ctx, Context.Rel.of_list ctx_with_eq
 
   (* Translate arguments by adding Boolean equality when relevant
 
@@ -680,8 +680,8 @@ let build_beq_scheme env handle kn =
   in
   (* params context divided *)
   let nonrecparams_ctx,recparams_ctx = Inductive.inductive_nonrec_rec_paramdecls (mib,u) in
-  let params_ctx = nonrecparams_ctx @ recparams_ctx in
-  let nparamsdecls = Context.Rel.length params_ctx in
+  let params_ctx = Context.Rel.to_list nonrecparams_ctx @ Context.Rel.to_list recparams_ctx in
+  let nparamsdecls = List.length params_ctx in
   check_no_indices mib;
 
   let env_lift_recparams, recparams_ctx_with_eqs =
@@ -729,7 +729,7 @@ let build_beq_scheme env handle kn =
       (* construct the predicate for the Case part*)
       Term.it_mkLambda_or_LetIn
         (mkLambda (Context.make_annot Anonymous Sorts.Relevant,
-                   mkFullInd env indu (List.length rettyp_l),
+                   mkFullInd env indu (Context.Rel.length rettyp_l),
                    (bb ())))
         rettyp_l in
     (* make_one_eq *)
@@ -739,7 +739,7 @@ let build_beq_scheme env handle kn =
     let rci = EConstr.ERelevance.relevant in (* returning a boolean, hence relevant *)
     let open Inductiveops in
     let constrs =
-      let params = Context.Rel.instance_list EConstr.mkRel 0 params_ctx in
+      let params = Context.Rel.instance_list EConstr.mkRel 0 (Context.Rel.of_list params_ctx) in
       get_constructors env (make_ind_family (on_snd EConstr.EInstance.make indu, params))
     in
     let make_andb_list = function
@@ -750,7 +750,7 @@ let build_beq_scheme env handle kn =
       match Environ.get_projections env ind with
       | Some projs ->
         (* A primitive record *)
-        let nb_cstr_args = List.length constrs.(0).cs_args in
+        let nb_cstr_args = Context.Rel.length constrs.(0).cs_args in
         let _,_,eqs = List.fold_right (fun decl (ndx,env_lift,l) ->
           let decl = EConstr.Unsafe.to_rel_decl decl in
           let env_lift' = push_env_lift decl env_lift in
@@ -770,8 +770,8 @@ let build_beq_scheme env handle kn =
                                                     mkProj (proj, relevance, mkRel 1)|])::l)
                 else
                   raise InternalDependencies)
-                        constrs.(0).cs_args (nb_cstr_args,env_lift_recparams_fix_nonrecparams_tomatch,[])
-        in
+                        (Context.Rel.to_list constrs.(0).cs_args) (nb_cstr_args,env_lift_recparams_fix_nonrecparams_tomatch,[])
+                in
         make_andb_list eqs
       | None ->
         (* An inductive type *)
@@ -779,7 +779,7 @@ let build_beq_scheme env handle kn =
         let nconstr = Array.length constrs in
         let ar =
           Array.init nconstr (fun i ->
-          let nb_cstr_args = List.length constrs.(i).cs_args in
+          let nb_cstr_args = Context.Rel.length constrs.(i).cs_args in
           let env_lift_recparams_fix_nonrecparams_tomatch_csargsi = shiftn_env_lift nb_cstr_args env_lift_recparams_fix_nonrecparams_tomatch in
           let ar2 = Array.init nconstr (fun j ->
             let env_lift_recparams_fix_nonrecparams_tomatch_csargsij = shiftn_env_lift nb_cstr_args env_lift_recparams_fix_nonrecparams_tomatch_csargsi in
@@ -801,7 +801,7 @@ let build_beq_scheme env handle kn =
                            (ndx-1,env_lift',mkApp (eqA, [|mkRel (ndx+nb_cstr_args);mkRel ndx|])::l)
                        else
                          raise InternalDependencies)
-                                constrs.(j).cs_args (nb_cstr_args,env_lift_recparams_fix_nonrecparams_tomatch_csargsij,[])
+                                (Context.Rel.to_list constrs.(j).cs_args) (nb_cstr_args,env_lift_recparams_fix_nonrecparams_tomatch_csargsij,[])
                 in
                 make_andb_list eqs
               else
@@ -827,7 +827,7 @@ let build_beq_scheme env handle kn =
         EConstr.Unsafe.to_constr case
     in
     Term.it_mkLambda_or_LetIn
-      (Term.it_mkLambda_or_LetIn body tomatch_ctx)
+      (Term.it_mkLambda_or_LetIn body (Context.Rel.of_list tomatch_ctx))
       nonrecparams_ctx_with_eqs
   in (* build_beq_scheme *)
 
@@ -1196,13 +1196,13 @@ let make_bl_scheme env handle mind =
   let nparrec = mib.mind_nparams_rec in
   let lnonparrec,lnamesparrec =
     Inductive.inductive_nonrec_rec_paramdecls (mib,u) in
-  let bl_goal = compute_bl_goal env handle (ind,u) lnamesparrec nparrec in
+  let bl_goal = compute_bl_goal env handle (ind,u) (Context.Rel.to_list lnamesparrec) nparrec in
   let bl_goal = EConstr.of_constr bl_goal in
   let univ_poly = Declareops.inductive_is_polymorphic mib in
   let poly = PolyFlags.of_univ_poly univ_poly in (* FIXME cumulativity not handled *)
   let uctx = if univ_poly then Evd.ustate (fst (Typing.sort_of env (Evd.from_ustate uctx) bl_goal)) else uctx in
   let (ans, _, _, uctx) = Subproof.build_by_tactic ~poly env ~uctx ~typ:bl_goal
-    (compute_bl_tact handle (ind, EConstr.EInstance.make u) lnamesparrec nparrec)
+    (compute_bl_tact handle (ind, EConstr.EInstance.make u) (Context.Rel.to_list lnamesparrec) nparrec)
   in
   ([|ans|], uctx)
 
@@ -1330,13 +1330,13 @@ let make_lb_scheme env handle mind =
   let nparrec = mib.mind_nparams_rec in
   let lnonparrec,lnamesparrec =
     Inductive.inductive_nonrec_rec_paramdecls (mib,u) in
-  let lb_goal = compute_lb_goal env handle (ind,u) lnamesparrec nparrec in
+  let lb_goal = compute_lb_goal env handle (ind,u) (Context.Rel.to_list lnamesparrec) nparrec in
   let lb_goal = EConstr.of_constr lb_goal in
   let poly = Declareops.inductive_is_polymorphic mib in
   let uctx = if poly then Evd.ustate (fst (Typing.sort_of env (Evd.from_ustate uctx) lb_goal)) else uctx in
   let poly = PolyFlags.of_univ_poly poly (* FIXME cumulativity not handled *) in
   let (ans, _, _, ctx) = Subproof.build_by_tactic ~poly env ~uctx ~typ:lb_goal
-    (compute_lb_tact handle ind lnamesparrec nparrec)
+    (compute_lb_tact handle ind (Context.Rel.to_list lnamesparrec) nparrec)
   in
   ([|ans|], ctx)
 
@@ -1525,13 +1525,13 @@ let make_eq_decidability env handle mind =
 
   let lnonparrec,lnamesparrec =
     Inductive.inductive_nonrec_rec_paramdecls (mib,u) in
-  let dec_goal = EConstr.of_constr (compute_dec_goal env (ind,u) lnamesparrec nparrec) in
+  let dec_goal = EConstr.of_constr (compute_dec_goal env (ind,u) (Context.Rel.to_list lnamesparrec) nparrec) in
   let univ_poly = Declareops.inductive_is_polymorphic mib in
   (* FIXME: cumulativity not handled *)
   let poly = PolyFlags.of_univ_poly univ_poly in
   let uctx = if univ_poly then Evd.ustate (fst (Typing.sort_of env (Evd.from_ustate uctx) dec_goal)) else uctx in
   let (ans, _, _, ctx) = Subproof.build_by_tactic ~poly env ~uctx
-      ~typ:dec_goal (compute_dec_tact handle (ind,u) lnamesparrec nparrec)
+      ~typ:dec_goal (compute_dec_tact handle (ind,u) (Context.Rel.to_list lnamesparrec) nparrec)
   in
   ([|ans|], ctx)
 

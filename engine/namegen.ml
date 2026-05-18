@@ -205,7 +205,8 @@ let name_context env sigma hyps =
     (List.fold_left
        (fun (env,hyps) d ->
           let d' = name_assumption env sigma d in (push_rel d' env, d' :: hyps))
-       (env,[]) (List.rev hyps))
+       (env,[]) (List.rev (Context.Rel.to_list hyps)))
+  |> Context.Rel.of_list
 
 let mkProd_or_LetIn_name env sigma b d = mkProd_or_LetIn (name_assumption env sigma d) b
 let mkLambda_or_LetIn_name env sigma b d = mkLambda_or_LetIn (name_assumption env sigma d) b
@@ -452,14 +453,17 @@ let next_name_away = next_name_away_with_default default_non_dependent_string
 
 let make_all_rel_context_name_different env sigma ctx =
   let avoid = ref (Id.Set.union (Context.Rel.to_vars (Environ.rel_context env)) (ids_of_named_context_val (named_context_val env))) in
-  Context.Rel.fold_outside
-    (fun decl (newenv,ctx) ->
-       let na = named_hd newenv sigma (RelDecl.get_type decl) (RelDecl.get_name decl) in
-       let id = next_name_away na !avoid in
-       avoid := Id.Set.add id !avoid;
-       let decl = RelDecl.set_name (Name id) decl in
-       push_rel decl newenv, decl :: ctx)
-    ctx ~init:(env,[])
+  let (env, ctx) =
+    Context.Rel.fold_outside
+      (fun decl (newenv,ctx) ->
+         let na = named_hd newenv sigma (RelDecl.get_type decl) (RelDecl.get_name decl) in
+         let id = next_name_away na !avoid in
+         avoid := Id.Set.add id !avoid;
+         let decl = RelDecl.set_name (Name id) decl in
+         push_rel decl newenv, decl :: ctx)
+      ctx ~init:(env,[])
+  in
+  (env, Context.Rel.of_list ctx)
 
 let make_all_name_different env sigma =
   (* FIXME: this is inefficient, but only used in printing *)

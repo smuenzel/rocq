@@ -159,8 +159,9 @@ let build_branches_type env sigma mib mip (ind,u) params (pctx, p) =
       let dep_cstr = mkApp(mkApp(mkConstructU (cstr,snd ind),params),relargs) in
       mkApp(papp,[|dep_cstr|])
     in
-    let decl_with_letin = List.firstn mip.mind_consnrealdecls.(i) ctx in
-    let nas = get_case_annot decl_with_letin in
+    let decl_with_letin = Context.Rel.firstn mip.mind_consnrealdecls.(i) ctx in
+    let decl_list = Context.Rel.to_list decl_with_letin in
+    let nas = get_case_annot decl_list in
     let nas =
       let u = EConstr.Unsafe.to_instance u in
       Array.map (Context.map_annot_relevance (UVars.subst_instance_relevance u)) nas
@@ -170,7 +171,7 @@ let build_branches_type env sigma mib mip (ind,u) params (pctx, p) =
     | LocalDef _ :: decls -> Esubst.el_shft 1 (get_lift decls)
     | LocalAssum _ :: decls -> Esubst.el_lift (get_lift decls)
     in
-    decl, nas, get_lift decl_with_letin, codom
+    decl, nas, get_lift decl_list, codom
   in
   Array.mapi build_one_branch mip.mind_nf_lc
 
@@ -328,7 +329,8 @@ and nf_atom_type env sigma atom =
       let nparams = mib.mind_nparams in
       let params,realargs = Array.chop nparams allargs in
       let pctx =
-        let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
+        let realdecls = Context.Rel.firstn mip.mind_nrealdecls mip.mind_arity_ctxt in
+        let realdecls = Context.Rel.to_list realdecls in
         (* NB expand_arity doesn't look at the relevances in nas *)
         let nas = List.rev_map get_annot realdecls @ [nameR (Id.of_string "c")] in
         expand_arity (mib, mip) (ind, u) params (Array.of_list nas)
@@ -345,7 +347,7 @@ and nf_atom_type env sigma atom =
       in
       let branchs = Array.mapi mkbranch bsw in
       let tcase = build_case_type (pctx, p) realargs a in
-      let p = (get_case_annot pctx, p) in
+      let p = (get_case_annot (Context.Rel.to_list pctx), p) in
       let ci = Inductiveops.make_case_info env ind MatchStyle in
       let iv = if Inductiveops.Internal.should_invert_case env sigma relevance ci then
           CaseInvert {indices=realargs}
@@ -396,7 +398,7 @@ and nf_predicate env sigma ind mip params v pctx =
     | Vfun f -> (k + 1, f (mk_rel_accu k))
     | _ -> assert false
   in
-  let (_, v) = List.fold_right fold pctx (nb_rel env, v) in
+  let (_, v) = List.fold_right fold (Context.Rel.to_list pctx) (nb_rel env, v) in
   let env = push_rel_context pctx env in
   let body = nf_type env sigma v in
   let rel = Retyping.relevance_of_type env sigma (EConstr.of_constr body) in

@@ -293,7 +293,7 @@ let create_cache info =
   let cache = RefTable.create 13 in
   let abstr_info = info.abstr_info in
   let named_ctx = lazy (abstract_named_context info.expand_info abstr_info.abstr_ausubst abstr_info.abstr_ctx) in
-  let rel_ctx = lazy (List.map NamedDecl.to_rel_decl (Lazy.force named_ctx)) in
+  let rel_ctx = lazy (Context.Rel.of_list (List.map NamedDecl.to_rel_decl (Lazy.force named_ctx))) in
   { cache; info; rel_ctx }
 
 (** Turn a named context [Δ] (hyps) and a universe named context

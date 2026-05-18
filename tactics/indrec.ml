@@ -40,8 +40,8 @@ let dbg = CDebug.create ~name:"generate_eliminators" ()
 (* ************************************************************************** *)
 
 let split_uparans_nuparams mib params =
-  let (uparams, nuparams) = Context.Rel.chop_nhyps mib.mind_nparams_rec (List.rev params) in
-  (List.rev uparams, List.rev nuparams)
+  let (uparams, nuparams) = Context.Rel.chop_nhyps mib.mind_nparams_rec (Context.Rel.rev params) in
+  (Context.Rel.rev uparams, Context.Rel.rev nuparams)
 
 (** Generalize parameters for template and univ poly, and split uniform and non-uniform parameters *)
 let get_params_sep sigma mib u =

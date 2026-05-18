@@ -126,7 +126,7 @@ let endclausestac id_map clseq gl_id cl0 =
     else [] in
   let mktac itacs = Tacticals.tclTHENLIST (itacs @ utacs @ ugtac :: ctacs) in
   let itac (_, id) = Tactics.introduction id in
-  if fits false (id_map, List.rev dc) then mktac (List.map itac id_map) else
+  if fits false (id_map, List.rev (Context.Rel.to_list dc)) then mktac (List.map itac id_map) else
   let all_ids = ids_of_rel_context dc @ Tacmach.pf_ids_of_hyps gl in
   if List.for_all not_hyp' all_ids && not c_hidden then mktac [] else
   errorstrm Pp.(str "tampering with discharged assumptions of \"in\" tactical")

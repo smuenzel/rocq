@@ -1384,7 +1384,7 @@ let hcons = HCons.hcons
 type rel_declaration = (constr, types, Sorts.relevance) Context.Rel.Declaration.pt
 type named_declaration = (constr, types, Sorts.relevance) Context.Named.Declaration.pt
 type compacted_declaration = (constr, types, Sorts.relevance) Context.Compacted.Declaration.pt
-type rel_context = rel_declaration list
+type rel_context = (constr, types, Sorts.relevance) Context.Rel.pt
 type named_context = named_declaration list
 type compacted_context = compacted_declaration list
 

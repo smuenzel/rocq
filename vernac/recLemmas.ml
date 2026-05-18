@@ -17,7 +17,7 @@ module RelDecl = Context.Rel.Declaration
 let find_mutually_recursive_statements sigma ctxs ccls =
     let inds = List.map2 (fun ctx ccl ->
       let (hyps,ccl) = EConstr.decompose_prod_decls sigma ccl in
-      let hyps = hyps @ ctx in
+      let hyps = Context.Rel.append hyps ctx in
       let whnf_hyp_hds = EConstr.map_rel_context_in_env
         (fun env c -> fst (Reductionops.whd_all_stack env sigma c))
         (Global.env()) hyps in
@@ -30,7 +30,7 @@ let find_mutually_recursive_statements sigma ctxs ccls =
                 mind.mind_finite <> Declarations.CoFinite ->
               [ind,i]
           | _ ->
-              []) 0 (List.rev (List.filter Context.Rel.Declaration.is_local_assum whnf_hyp_hds))) in
+              []) 0 (List.rev (List.filter Context.Rel.Declaration.is_local_assum (Context.Rel.to_list whnf_hyp_hds)))) in
       let ind_ccl =
         let cclenv = EConstr.push_rel_context hyps (Global.env()) in
         let whnf_ccl,_ = Reductionops.whd_all_stack cclenv sigma ccl in

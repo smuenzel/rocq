@@ -125,9 +125,9 @@ let rec to_prod n lam =
       | Cast (c,_,_) -> to_prod n c
       | _   -> anomaly Pp.(str "Not enough prod's.")
 
-let it_mkProd_or_LetIn   = List.fold_left (fun c d -> mkProd_or_LetIn d c)
-let it_mkProd_wo_LetIn   = List.fold_left (fun c d -> mkProd_wo_LetIn d c)
-let it_mkLambda_or_LetIn = List.fold_left (fun c d -> mkLambda_or_LetIn d c)
+let it_mkProd_or_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkProd_or_LetIn d c) ~init:t ctx
+let it_mkProd_wo_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkProd_wo_LetIn d c) ~init:t ctx
+let it_mkLambda_or_LetIn c ctx = Context.Rel.fold_inside (fun c d -> mkLambda_or_LetIn d c) ~init:c ctx
 
 (* Application with expected on-the-fly reduction *)
 
@@ -284,8 +284,8 @@ let decompose_lambda_prod_n_decls n =
     else
       let open Context.Rel.Declaration in
       match kind c, kind t with
-      | Lambda (na, u, c), Prod (_, _, t) -> lamprodec_rec (LocalAssum (na, u) :: l) (n-1) c t
-      | LetIn (na, b, u, c), LetIn (_, _, _, t) -> lamprodec_rec (LocalDef (na, b, u) :: l) (n-1) c t
+      | Lambda (na, u, c), Prod (_, _, t) -> lamprodec_rec (Context.Rel.add (LocalAssum (na, u)) l) (n-1) c t
+      | LetIn (na, b, u, c), LetIn (_, _, _, t) -> lamprodec_rec (Context.Rel.add (LocalDef (na, b, u)) l) (n-1) c t
       | _ -> anomaly (str "decompose_lambda_prod_n_decls: not same form.")
   in
   lamprodec_rec Context.Rel.empty n
@@ -359,13 +359,13 @@ let destArity =
   let open Context.Rel.Declaration in
   let rec prodec_rec l c =
     match kind c with
-    | Prod (x,t,c)    -> prodec_rec (LocalAssum (x,t) :: l) c
-    | LetIn (x,b,t,c) -> prodec_rec (LocalDef (x,b,t) :: l) c
+    | Prod (x,t,c)    -> prodec_rec (Context.Rel.add (LocalAssum (x,t)) l) c
+    | LetIn (x,b,t,c) -> prodec_rec (Context.Rel.add (LocalDef (x,b,t)) l) c
     | Cast (c,_,_)    -> prodec_rec l c
     | Sort s          -> l,s
     | _               -> anomaly ~label:"destArity" (Pp.str "not an arity.")
   in
-  prodec_rec []
+  prodec_rec Context.Rel.empty
 
 let mkArity (sign,s) = it_mkProd_or_LetIn (mkSort s) sign
 

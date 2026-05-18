@@ -158,7 +158,7 @@ let left_instance_tac ~flags (inst,id) continue seq=
                   let (evmap, rc, ot) = mk_open_instance env sigma id idc c in
                   let gt=
                     it_mkLambda_or_LetIn
-                      (mkApp(idc,[|ot|])) rc in
+                      (mkApp(idc,[|ot|])) (Context.Rel.of_list rc) in
                   let evmap, _ =
                     try Typing.type_of env evmap gt
                     with e when CErrors.noncritical e ->

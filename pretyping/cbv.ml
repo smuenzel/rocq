@@ -476,7 +476,7 @@ let expand_branch env u pms (ind, i) br =
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let paramsubst = Vars.subst_of_rel_context_instance paramdecl pms in
   let (ctx, _) = mip.mind_nf_lc.(i - 1) in
-  let (ctx, _) = List.chop mip.mind_consnrealdecls.(i - 1) ctx in
+  let ctx = Context.Rel.firstn mip.mind_consnrealdecls.(i - 1) ctx in
   Inductive.instantiate_context u paramsubst nas ctx
 
 let cbv_subst_of_rel_context_instance_list mkclos sign args env =
@@ -488,7 +488,7 @@ let cbv_subst_of_rel_context_instance_list mkclos sign args env =
         aux (subs_cons (mkclos subst c) subst) sign' args'
     | [], [] -> subst
     | _ -> CErrors.anomaly (Pp.str "Instance and signature do not match.")
-  in aux env (List.rev sign) args
+  in aux env (List.rev (Context.Rel.to_list sign)) args
 
 (* The main recursive functions
  *
@@ -761,9 +761,9 @@ and it_mkLambda_or_LetIn info ctx t =
   | LocalAssum (n, ty) :: ctx ->
       let assums, ctx = List.map_until (function LocalAssum (n, ty) -> Some (n, ty) | LocalDef _ -> None) ctx in
       let assums = (n, ty) :: assums in
-      LAMBDA (List.length assums, assums, Term.it_mkLambda_or_LetIn (reify_value t) (List.rev ctx), subs_id 0)
+      LAMBDA (List.length assums, assums, Term.it_mkLambda_or_LetIn (reify_value t) (Context.Rel.of_list (List.rev ctx)), subs_id 0)
   | LocalDef _ :: _ ->
-      cbv_stack_term info TOP (subs_id 0) (Term.it_mkLambda_or_LetIn (reify_value t) ctx)
+      cbv_stack_term info TOP (subs_id 0) (Term.it_mkLambda_or_LetIn (reify_value t) (Context.Rel.of_list ctx))
 
 and cbv_match_arg_pattern info env ctx psubst p t =
   let open Declarations in
@@ -869,9 +869,9 @@ and cbv_apply_rule info env ctx psubst es stk =
       if not @@ Environ.QInd.equal info.env pind ci.ci_ind then raise PatternFailure;
       let specif = Inductive.lookup_mind_specif info.env ci.ci_ind in
       let ntys_ret = Inductive.expand_arity specif (ci.ci_ind, u) pms (fst p) in
-      let ntys_ret = apply_env_context env ntys_ret in
+      let ntys_ret = apply_env_context env (Context.Rel.to_list ntys_ret) in
       let ntys_brs = Inductive.expand_branch_contexts specif u pms brs in
-      let brs = Array.map2 (fun ctx' br -> List.length ctx', ctx' @ ctx, (snd br)) ntys_brs brs in
+      let brs = Array.map2 (fun ctx' br -> let ctx' = Context.Rel.to_list ctx' in List.length ctx', ctx' @ ctx, (snd br)) ntys_brs brs in
       let psubst = cbv_match_arg_pattern_lift info env (ntys_ret @ ctx) (List.length ntys_ret) psubst pret (snd p) in
       let psubst = Array.fold_left2 (fun psubst pat (n, ctx, br) -> cbv_match_arg_pattern_lift info env (apply_env_context env ctx) n psubst pat br) psubst pbrs brs in
       cbv_apply_rule info env ctx psubst e s
@@ -919,7 +919,8 @@ let rec apply_stack info t = function
     let mk_br c n = Term.decompose_lambda_n_decls n c in
     let br = Array.map2 mk_br br ci.ci_cstr_ndecls in
     let aux = if info.strong then cbv_norm_term info else apply_env in
-    let map_ctx (nas, c) =
+    let map_ctx (nas0, c) =
+      let nas = Context.Rel.to_list nas0 in
       let open Context.Rel.Declaration in
       let fold decl e = match decl with
       | LocalAssum _ -> subs_lift e

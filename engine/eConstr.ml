@@ -518,7 +518,7 @@ let to_rel_decl sigma (d:rel_declaration) : Constr.rel_declaration =
 let to_rel_context sigma (ctx:rel_context) : Constr.rel_context =
   let Refl = unsafe_eq in
   let Refl = unsafe_relevance_eq in
-  List.Smart.map (to_rel_decl sigma) ctx
+  Context.Rel.of_list (List.Smart.map (to_rel_decl sigma) (Context.Rel.to_list ctx))
 
 let to_named_decl sigma (d:named_declaration) : Constr.named_declaration =
   let Refl = unsafe_eq in
@@ -629,7 +629,8 @@ let expand_branch env _sigma u pms (ind, i) (nas, _br) =
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let paramsubst = Vars.subst_of_rel_context_instance paramdecl pms in
   let (ctx, _) = mip.mind_nf_lc.(i - 1) in
-  let (ctx, _) = List.chop mip.mind_consnrealdecls.(i - 1) ctx in
+  let (ctx, _) = List.chop mip.mind_consnrealdecls.(i - 1) (Context.Rel.to_list ctx) in
+  let ctx = Context.Rel.of_list ctx in
   let nas =
     let gen : type a b. (a,b) eq -> (_,a) Context.pbinder_annot array ->
       (_,b) Context.pbinder_annot array =
@@ -674,7 +675,7 @@ let iter_with_full_binders env sigma g f n c =
     List.iter (fun c -> f n c) l
   | Case (ci,u,pms,p,iv,c,bl) ->
     let (ci, _, pms, (p,_), iv, c, bl) = annotate_case env sigma (ci, u, pms, p, iv, c, bl) in
-    let f_ctx (ctx, c) = f (List.fold_right g ctx n) c in
+    let f_ctx (ctx, c) = f (Context.Rel.fold_outside g ctx ~init:n) c in
     Array.Fun1.iter f n pms; f_ctx p; iter_invert (f n) iv; f n c; Array.iter f_ctx bl
   | Proj (_,_,c) -> f n c
   | Fix (_,(lna,tl,bl)) ->
@@ -1139,11 +1140,11 @@ let mkNamedProd_wo_LetIn sigma decl c =
 let it_mkProd init = List.fold_left (fun c (n,t)  -> mkProd (n, t, c)) init
 let it_mkLambda init = List.fold_left (fun c (n,t)  -> mkLambda (n, t, c)) init
 
-let it_mkProd_or_LetIn t ctx = List.fold_left (fun c d -> mkProd_or_LetIn d c) t ctx
-let it_mkLambda_or_LetIn t ctx = List.fold_left (fun c d -> mkLambda_or_LetIn d c) t ctx
+let it_mkProd_or_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkProd_or_LetIn d c) ~init:t ctx
+let it_mkLambda_or_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkLambda_or_LetIn d c) ~init:t ctx
 
-let it_mkProd_wo_LetIn t ctx = List.fold_left (fun c d -> mkProd_wo_LetIn d c) t ctx
-let it_mkLambda_wo_LetIn t ctx = List.fold_left (fun c d -> mkLambda_wo_LetIn d c) t ctx
+let it_mkProd_wo_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkProd_wo_LetIn d c) ~init:t ctx
+let it_mkLambda_wo_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkLambda_wo_LetIn d c) ~init:t ctx
 
 let it_mkNamedProd_or_LetIn sigma t ctx = List.fold_left (fun c d -> mkNamedProd_or_LetIn sigma d c) t ctx
 let it_mkNamedLambda_or_LetIn sigma t ctx = List.fold_left (fun c d -> mkNamedLambda_or_LetIn sigma d c) t ctx
@@ -1169,7 +1170,7 @@ let destArity sigma =
     | Prod (x,t,c)    -> prodec_rec (LocalAssum (x,t) :: l) c
     | LetIn (x,b,t,c) -> prodec_rec (LocalDef (x,b,t) :: l) c
     | Cast (c,_,_)      -> prodec_rec l c
-    | Sort s          -> l,s
+    | Sort s          -> Context.Rel.of_list l, s
     | _               -> anomaly ~label:"destArity" (Pp.str "not an arity.")
   in
   prodec_rec []
@@ -1202,7 +1203,7 @@ let map_rel_context_in_env f env sign =
     | [] ->
         acc
   in
-  aux env [] (List.rev sign)
+  Context.Rel.of_list (aux env [] (List.rev (Context.Rel.to_list sign)))
 
 let match_named_context_val :
   named_context_val -> (named_declaration * named_context_val) option =

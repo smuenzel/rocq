@@ -39,15 +39,15 @@ let compute_new_princ_type_from_rel env rel_to_fun sorts princ_type =
   let tbl = Hashtbl.create 792 in
   let rec change_predicates_names (avoid : Id.t list)
       (predicates : EConstr.rel_context) : EConstr.rel_context =
-    match predicates with
-    | [] -> []
+    match Context.Rel.to_list predicates with
+    | [] -> Context.Rel.empty
     | decl :: predicates -> (
       match Context.Rel.Declaration.get_name decl with
       | Name x ->
         let id = Namegen.next_ident_away x (Id.Set.of_list avoid) in
         Hashtbl.add tbl id x;
-        RelDecl.set_name (Name id) decl
-        :: change_predicates_names (id :: avoid) predicates
+        Context.Rel.add (RelDecl.set_name (Name id) decl)
+          (change_predicates_names (id :: avoid) (Context.Rel.of_list predicates))
       | Anonymous -> anomaly (Pp.str "Anonymous property binder.") )
   in
   let avoid = Termops.ids_of_context env_with_params in
@@ -63,14 +63,14 @@ let compute_new_princ_type_from_rel env rel_to_fun sorts princ_type =
       decompose_prod_decls (EConstr.Unsafe.to_constr (RelDecl.get_type decl))
     in
     let real_args =
-      if princ_type_info.indarg_in_concl then List.tl args else args
+      if princ_type_info.indarg_in_concl then Context.Rel.to_list args |> List.tl |> Context.Rel.of_list else args
     in
     let na = map_annot Nameops.Name.get_id (Context.Rel.Declaration.get_annot decl) in
     let na = EConstr.Unsafe.to_binder_annot na in
     Context.Named.Declaration.LocalAssum (na, Term.it_mkProd_or_LetIn (mkSort new_sort) real_args)
   in
   let new_predicates =
-    List.map_i change_predicate_sort 0 princ_type_info.predicates
+    List.map_i change_predicate_sort 0 (Context.Rel.to_list princ_type_info.predicates)
   in
   let env_with_params_and_predicates =
     List.fold_right Environ.push_named new_predicates env_with_params
@@ -250,15 +250,16 @@ let compute_new_princ_type_from_rel env rel_to_fun sorts princ_type =
   in
   it_mkProd_or_LetIn
     (it_mkProd_or_LetIn pre_res
-       (List.map
-          (function
-            | Context.Named.Declaration.LocalAssum (id, b) ->
-              LocalAssum
-                (map_annot (fun id -> Name.mk_name (Hashtbl.find tbl id)) id, b)
-            | Context.Named.Declaration.LocalDef (id, t, b) ->
-              LocalDef
-                ( map_annot (fun id -> Name.mk_name (Hashtbl.find tbl id)) id
-                , t
-                , b ))
-          new_predicates))
+       (Context.Rel.of_list
+          (List.map
+             (function
+               | Context.Named.Declaration.LocalAssum (id, b) ->
+                 LocalAssum
+                   (map_annot (fun id -> Name.mk_name (Hashtbl.find tbl id)) id, b)
+               | Context.Named.Declaration.LocalDef (id, t, b) ->
+                 LocalDef
+                   ( map_annot (fun id -> Name.mk_name (Hashtbl.find tbl id)) id
+                   , t
+                   , b ))
+             new_predicates)))
     (EConstr.Unsafe.to_rel_context princ_type_info.params)

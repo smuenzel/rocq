@@ -1271,7 +1271,7 @@ let rec unify_0_with_initial_metas (subst : subst0) conv_at_top env pb flags m n
              let substn = Array.fold_left2 (unirec_rec curenvnb CONV ~nargs:0 opt') substn pms1 pms2 in
              let (ci1, _, _, (p1,_), _, c1, cl1) = EConstr.annotate_case env sigma (ci1, u1, pms1, p1, iv1, c1, cl1) in
              let unif opt substn (ctx1, c1) (_, c2) =
-               let curenvnb' = List.fold_right (fun decl (env, n) -> push_rel decl env, n + 1) ctx1 curenvnb in
+               let curenvnb' = List.fold_right (fun decl (env, n) -> push_rel decl env, n + 1) (Context.Rel.to_list ctx1) curenvnb in
                unirec_rec curenvnb' CONV opt' substn c1 c2
              in
              let substn = unif opt' substn p1 p2 in

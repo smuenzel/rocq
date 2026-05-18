@@ -224,9 +224,10 @@ let build_atoms (type a) ~flags state env sigma metagen (side : a side) cciterm 
           let g i _ decl =
             build_rec subst polarity (lift i (RelDecl.get_type decl)) in
           let f l =
-            List.fold_left_i g (1-(List.length l)) () l in
+            let l_list = Context.Rel.to_list l in
+            List.fold_left_i g (1-(List.length l_list)) () l_list in
             if polarity && (* we have a constant constructor *)
-              Array.exists (function []->true|_->false) v
+              Array.exists (fun ctx -> Context.Rel.length ctx = 0) v
             then trivial:=true;
             Array.iter f v
       | Exists(i,l)->
@@ -234,7 +235,7 @@ let build_atoms (type a) ~flags state env sigma metagen (side : a side) cciterm 
           let v =(ind_hyps env sigma 1 i l).(0) in
           let g i _ decl =
             build_rec (var::subst) polarity (lift i (RelDecl.get_type decl)) in
-            List.fold_left_i g (2-(List.length l)) () v
+            List.fold_left_i g (2-(List.length l)) () (Context.Rel.to_list v)
       | Forall(_,b)->
           let var = metagen true in
             build_rec (var::subst) polarity b
@@ -323,7 +324,7 @@ let build_formula (type a) ~flags state env sigma (side : a side) (nam : a ident
                   | And(_,_,_)        -> Rand
                   | Or(_,_,_)         -> Ror
                   | Exists (i,l) ->
-                      let d = RelDecl.get_type (List.last (ind_hyps env sigma 0 i l).(0)) in
+                      let d = RelDecl.get_type (List.last (Context.Rel.to_list (ind_hyps env sigma 0 i l).(0))) in
                         Rexists(m,d,trivial)
                   | Forall (_,a) -> Rforall
                   | Arrow (a,b) -> Rarrow in

@@ -81,10 +81,7 @@ let is_opaque cb = match cb.const_body with
 
 (** {7 Constant substitutions } *)
 
-let subst_rel_declaration subst =
-  RelDecl.map_constr (subst_mps subst)
-
-let subst_rel_context subst = List.Smart.map (subst_rel_declaration subst)
+let subst_rel_context subst = Context.Rel.map (subst_mps subst)
 
 let subst_const_type subst arity =
   if is_empty_subst subst then arity
@@ -126,7 +123,7 @@ let subst_const_body subst cb =
 let hcons_rel_decl =
   RelDecl.map_name (noh Names.Name.hcons) %> RelDecl.map_value (noh Constr.hcons) %> RelDecl.map_type (noh Constr.hcons)
 
-let hcons_rel_context l = List.Smart.map hcons_rel_decl l
+let hcons_rel_context l = Context.Rel.of_list (List.Smart.map hcons_rel_decl (Context.Rel.to_list l))
 
 let hcons_const_def ?(hbody=noh Constr.hcons) = function
   | Undef inl -> Undef inl

@@ -222,7 +222,7 @@ let rec safe_pattern_of_constr_aux ~loc env evd usubst depth state t = Constr.ki
 
       let state, pret =
         let (nas, p) = ret in
-        let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
+        let realdecls, _ = List.chop mip.mind_nrealdecls (Context.Rel.to_list mip.mind_arity_ctxt) in
         let self =
           let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
           let inst = UVars.Instance.(abstract_instance (length u)) in
@@ -231,15 +231,15 @@ let rec safe_pattern_of_constr_aux ~loc env evd usubst depth state t = Constr.ki
         let na = Context.make_annot Anonymous mip.mind_relevance in
         let realdecls = Context.Rel.Declaration.LocalAssum (na, self) :: realdecls in
         let realdecls =
-          Inductive.instantiate_context u paramsubst nas realdecls
+          Inductive.instantiate_context u paramsubst nas (Context.Rel.of_list realdecls)
         in
         let p_env = Environ.push_rel_context realdecls env in
         safe_arg_pattern_of_constr ~loc p_env evd usubst (depth + Array.length nas) state p
       in
       let do_one_branch i state (nas, br) =
         let (ctx, cty) = mip.mind_nf_lc.(i) in
-        let bctx, _ = List.chop mip.mind_consnrealdecls.(i) ctx in
-        let bctx = Inductive.instantiate_context u paramsubst nas bctx in
+        let bctx, _ = List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list ctx) in
+        let bctx = Inductive.instantiate_context u paramsubst nas (Context.Rel.of_list bctx) in
         let br_env = Environ.push_rel_context bctx env in
         safe_arg_pattern_of_constr ~loc br_env evd usubst (depth + Array.length nas) state br
       in

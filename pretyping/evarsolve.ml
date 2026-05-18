@@ -453,7 +453,7 @@ let compute_rel_aliases var_aliases rels sigma =
 let make_alias_map env sigma =
   (* We compute the chain of aliases for each var and rel *)
   let var_aliases = compute_var_aliases (named_context env) sigma in
-  let rel_aliases = compute_rel_aliases var_aliases (rel_context env) sigma in
+  let rel_aliases = compute_rel_aliases var_aliases (Context.Rel.to_list (rel_context env)) sigma in
   { var_aliases; rel_aliases }
 
 let lift_aliases n aliases =
@@ -873,7 +873,7 @@ let materialize_evar define_fun env evd k (evk1,args1) ty_in_env =
        SList.cons (mkRel 1) (SList.Skip.map (lift 1) inst_in_env),
        SList.cons (mkRel 1) (SList.Skip.map (lift 1) inst_in_sign),
        push_rel d env,evd,Id.Set.add id.binder_name avoid))
-      rel_sign
+      (Context.Rel.to_list rel_sign)
       (sign1,filter1,args1,inst_in_sign,env1,evd,avoid)
   in
   let s = Retyping.get_sort_of env evd ty_in_env in

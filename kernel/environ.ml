@@ -121,7 +121,7 @@ let empty_named_context_val = {
 }
 
 let empty_rel_context_val = {
-  env_rel_ctx = [];
+  env_rel_ctx = Context.Rel.empty;
   env_rel_map = Range.empty;
 }
 
@@ -155,10 +155,10 @@ let push_rel_context_val d ctx = {
   env_rel_map = Range.cons d ctx.env_rel_map;
 }
 
-let match_rel_context_val ctx = match ctx.env_rel_ctx with
+let match_rel_context_val ctx = match Context.Rel.to_list ctx.env_rel_ctx with
 | [] -> None
 | decl :: rem ->
-  let ctx = { env_rel_ctx = rem; env_rel_map = Range.tl ctx.env_rel_map } in
+  let ctx = { env_rel_ctx = Context.Rel.of_list rem; env_rel_map = Range.tl ctx.env_rel_map } in
   Some (decl, ctx)
 
 let push_rel d env =
@@ -171,7 +171,7 @@ let lookup_rel n env =
   with Invalid_argument _ -> raise Not_found
 
 let rel_skipn n ctx = {
-  env_rel_ctx = Util.List.skipn n ctx.env_rel_ctx;
+  env_rel_ctx = Context.Rel.skipn n ctx.env_rel_ctx;
   env_rel_map = Range.skipn n ctx.env_rel_map;
 }
 
@@ -315,19 +315,19 @@ let instantiate_context u subst nas ctx =
     { binder_name = nas.(i).binder_name;
       binder_relevance = UVars.subst_instance_relevance u na.binder_relevance }
   in
-  let rec instantiate i ctx = match ctx with
-  | [] -> assert (Int.equal i (-1)); []
+  let rec instantiate i ctx = match Context.Rel.to_list ctx with
+  | [] -> assert (Int.equal i (-1)); Context.Rel.empty
   | LocalAssum (na, ty) :: ctx ->
-    let ctx = instantiate (pred i) ctx in
+    let ctx = instantiate (pred i) (Context.Rel.of_list ctx) in
     let ty = substnl subst i (subst_instance_constr u ty) in
     let na = get_binder i na in
-    LocalAssum (na, ty) :: ctx
+    Context.Rel.add (LocalAssum (na, ty)) ctx
   | LocalDef (na, ty, bdy) :: ctx ->
-    let ctx = instantiate (pred i) ctx in
+    let ctx = instantiate (pred i) (Context.Rel.of_list ctx) in
     let ty = substnl subst i (subst_instance_constr u ty) in
     let bdy = substnl subst i (subst_instance_constr u bdy) in
     let na = get_binder i na in
-    LocalDef (na, ty, bdy) :: ctx
+    Context.Rel.add (LocalDef (na, ty, bdy)) ctx
   in
   instantiate (Array.length nas - 1) ctx
 
@@ -335,7 +335,7 @@ let expand_arity (mib, mip) (ind, u) params nas =
   let open Context.Rel.Declaration in
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let params = Vars.subst_of_rel_context_instance paramdecl params in
-  let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
+  let realdecls, _ = List.chop mip.mind_nrealdecls (Context.Rel.to_list mip.mind_arity_ctxt) in
   let self =
     let u = UVars.Instance.abstract_instance (UVars.Instance.length u) in
     let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
@@ -343,14 +343,14 @@ let expand_arity (mib, mip) (ind, u) params nas =
   in
   let na = Context.make_annot Anonymous mip.mind_relevance in
   let realdecls = LocalAssum (na, self) :: realdecls in
-  instantiate_context u params nas realdecls
+  instantiate_context u params nas (Context.Rel.of_list realdecls)
 
 let expand_branch_contexts (mib, mip) u params br =
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let paramsubst = Vars.subst_of_rel_context_instance paramdecl params in
   let build_one_branch i (nas, _) (ctx, _) =
-    let ctx, _ = List.chop mip.mind_consnrealdecls.(i) ctx in
-    let ctx = instantiate_context u paramsubst nas ctx in
+    let ctx, _ = List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list ctx) in
+    let ctx = instantiate_context u paramsubst nas (Context.Rel.of_list ctx) in
     ctx
   in
   Array.map2_i build_one_branch br mip.mind_nf_lc
@@ -398,9 +398,8 @@ let rel_context env = env.env_rel_context.env_rel_ctx
 let rel_context_val env = env.env_rel_context
 
 let empty_context env =
-  match env.env_rel_context.env_rel_ctx, env.env_named_context.env_named_ctx with
-  | [], [] -> true
-  | _ -> false
+  Int.equal (Context.Rel.length env.env_rel_context.env_rel_ctx) 0 &&
+  Int.equal (Context.Named.length env.env_named_context.env_named_ctx) 0
 
 (* Rel context *)
 let evaluable_rel n env =

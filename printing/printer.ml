@@ -456,7 +456,7 @@ let pr_context_unlimited ?flags env sigma =
   (sign_env ++ db_env)
 
 let pr_ne_context_of header ?flags env sigma =
-  if List.is_empty (Environ.rel_context env) &&
+  if Context.Rel.length (Environ.rel_context env) = 0 &&
     List.is_empty (Environ.named_context env)  then (mt ())
   else let penv = pr_context_unlimited ?flags env sigma in (header ++ penv ++ fnl ())
 

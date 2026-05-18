@@ -291,7 +291,7 @@ let print_env_short env sigma =
   in
   let pr_named_decl = NamedDecl.to_rel_decl %> pr_rel_decl in
   let nc = List.rev (named_context env) in
-  let rc = List.rev (rel_context env) in
+  let rc = Context.Rel.to_list (Context.Rel.rev (rel_context env)) in
     str "[" ++ pr_sequence pr_named_decl nc ++ str "]" ++ spc () ++
     str "[" ++ pr_sequence pr_rel_decl rc ++ str "]"
 
@@ -437,7 +437,7 @@ let push_rel_assum (x,t) env =
 
 let push_rels_assum assums =
   let open RelDecl in
-  push_rel_context (List.map (fun (x,t) -> LocalAssum (x,t)) assums)
+  push_rel_context (Context.Rel.of_list (List.map (fun (x,t) -> LocalAssum (x,t)) assums))
 
 let lookup_rel_id id sign =
   let open RelDecl in
@@ -448,7 +448,7 @@ let lookup_rel_id id sign =
       then (n, get_value decl, get_type decl)
       else lookrec (n+1) l
   in
-  lookrec 1 sign
+  lookrec 1 (Context.Rel.to_list sign)
 
 (* On Constr *)
 let it_named_context_quantifier f ~init = List.fold_left (fun c d -> f d c) init
@@ -460,7 +460,8 @@ let it_mkLambda_or_LetIn_from_no_LetIn c decls =
   | [] -> c
   | LocalDef (na,b,t) :: decls -> mkLetIn (na,b,t,aux (k-1) decls (liftn 1 k c))
   | LocalAssum (na,t) :: decls -> mkLambda (na,t,aux (k-1) decls c)
-  in aux (List.length decls) (List.rev decls) c
+  in let decls' = Context.Rel.to_list decls in
+  aux (List.length decls') (List.rev decls') c
 
 (* strips head casts and flattens head applications *)
 let rec strip_head_cast sigma c = match EConstr.kind sigma c with
@@ -583,7 +584,7 @@ let map_constr_with_binders_left_to_right env sigma g f l c =
   | Case (ci,u,pms,(p,r),iv,b,bl) ->
       let (ci, _, pms, (p0,_), _, b, bl0) = annotate_case env sigma (ci, u, pms, (p,r), iv, b, bl) in
       let f_ctx (nas, _ as r) (ctx, c) =
-        let c' = f (List.fold_right g ctx l) c in
+        let c' = f (Context.Rel.fold_outside g ctx ~init:l) c in
         if c' == c then r else (nas, c')
       in
       (* In v8 concrete syntax, predicate is after the term to match! *)
@@ -649,7 +650,7 @@ let map_constr_with_full_binders env sigma g f l cstr =
   | Case (ci, u, pms, (p,r), iv, c, bl) ->
       let (ci, _, pms, (p0,_), _, c, bl0) = annotate_case env sigma (ci, u, pms, (p,r), iv, c, bl) in
       let f_ctx (nas, _ as r) (ctx, c) =
-        let c' = f (List.fold_right g ctx l) c in
+        let c' = f (Context.Rel.fold_outside g ctx ~init:l) c in
         if c' == c then r else (nas, c')
       in
       let pms' = Array.Smart.map (f l) pms in
@@ -702,7 +703,7 @@ let fold_constr_with_full_binders env sigma g f n acc c =
     List.fold_left (fun c -> f n c) acc args
   | Case (ci, u, pms, p, iv, c, bl) ->
     let (ci, _, pms, (p,_), _, c, bl) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, c, bl) in
-    let f_ctx acc (ctx, c) = f (List.fold_right g ctx n) acc c in
+    let f_ctx acc (ctx, c) = f (Context.Rel.fold_outside g ctx ~init:n) acc c in
     Array.fold_left f_ctx (f n (fold_invert (f n) (f_ctx (Array.fold_left (f n) acc pms) p) iv) c) bl
   | Fix (_,(lna,tl,bl)) ->
       let n' = CArray.fold_left2_i (fun i c n t -> g (LocalAssum (n,lift i t)) c) n lna tl in
@@ -1006,7 +1007,7 @@ let ids_of_context env =
 
 
 let names_of_rel_context env =
-  List.map RelDecl.get_name (rel_context env)
+  List.map RelDecl.get_name (Context.Rel.to_list (rel_context env))
 
 let is_section_variable env id =
   try let _ = Environ.lookup_named id env in true
@@ -1136,6 +1137,7 @@ let rec eta_reduce_head sigma c =
 
 let eta_expand_instantiation ?evars env inst ctxt =
   let open Context.Rel.Declaration in
+  let ctxt = Context.Rel.to_list ctxt in
   let eta_inst = Array.make (Array.length inst) mkProp in
   let rec fold subst i = function
   | [] -> assert (Array.length inst = i)
@@ -1172,7 +1174,7 @@ let map_rel_context_in_env f env sign =
     | [] ->
         acc
   in
-  aux env [] (List.rev sign)
+  Context.Rel.of_list (aux env [] (List.rev (Context.Rel.to_list sign)))
 
 let fold_named_context_both_sides f l ~init = List.fold_right_and_left f l init
 
@@ -1270,10 +1272,10 @@ let prod_applist_decls sigma n c l =
 (* Do not skip let-in's *)
 let env_rel_context_chop k env =
   let open EConstr in
-  let rels = rel_context env in
+  let rels = Context.Rel.to_list (rel_context env) in
   let ctx1,ctx2 = List.chop k rels in
-  push_rel_context ctx2 (reset_with_named_context (named_context_val env) env),
-  ctx1
+  push_rel_context (Context.Rel.of_list ctx2) (reset_with_named_context (named_context_val env) env),
+  Context.Rel.of_list ctx1
 
 (** Terms as a datatype *)
 

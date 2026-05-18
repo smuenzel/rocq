@@ -824,6 +824,7 @@ let unfold_constr = function
     As [default_id] checks the sort of the type to build hyp names,
     we maintain an environment to be able to type dependent hyps. *)
 let find_intro_names env0 sigma ctxt =
+  let ctxt = Context.Rel.to_list ctxt in
   let _, res, _ = List.fold_right
     (fun decl acc ->
       let env,idl,avoid = acc in
@@ -952,7 +953,7 @@ let intro_forthcoming_last_then_gen avoid dep_flag bound n tac =
       let rels = List.init (List.length decls) (fun i -> mkRel (i + 1)) in
       let ninst = List.fold_right (fun c accu -> SList.cons c accu) rels inst in
       let (sigma, ev) = new_pure_evar nctx sigma ~relevance nconcl in
-      (sigma, it_mkLambda_or_LetIn (mkEvar (ev, ninst)) decls,
+      (sigma, it_mkLambda_or_LetIn (mkEvar (ev, ninst)) (Context.Rel.of_list decls),
        Some ev)
     end <*> tac ids
   end
@@ -1484,7 +1485,7 @@ let make_projection env sigma params cstr sign elim i n c (ind, u) =
   | NotADefinedRecordUseScheme ->
       (* bugs: goes from right to left when i increases! *)
       let cs_args = cstr.cs_args in
-      let decl = List.nth cs_args i in
+      let decl = List.nth (Context.Rel.to_list cs_args) i in
       let t = RelDecl.get_type decl in
       let b = match decl with LocalAssum _ -> mkRel (i+1) | LocalDef (_,b,_) -> b in
       if
@@ -1499,15 +1500,15 @@ let make_projection env sigma params cstr sign elim i n c (ind, u) =
         let t = lift (i + 1 - n) t in
         let ksort = Retyping.get_sort_quality_or_set_of (push_rel_context sign env) sigma t in
         if UnivGen.QualityOrSet.eliminates_to (Inductiveops.elim_sort specif) ksort then
-          let arity = List.firstn mip.mind_nrealdecls mip.mind_arity_ctxt in
+          let arity = List.firstn mip.mind_nrealdecls (Context.Rel.to_list mip.mind_arity_ctxt) in
           let mknas ctx = Array.of_list (List.rev_map get_annot ctx) in
           let ci = Inductiveops.make_case_info env ind MatchStyle in
-          let br = [| mknas cs_args, b |] in
+          let br = [| mknas (Context.Rel.to_list cs_args), b |] in
           let args = Context.Rel.instance mkRel 0 sign in
           let indr = ERelevance.make @@
             Inductive.relevance_of_ind_body mip (EConstr.Unsafe.to_instance u)
           in
-          let pnas = Array.append (mknas (EConstr.of_rel_context arity)) [|make_annot Anonymous indr|] in
+          let pnas = Array.append (mknas (Context.Rel.to_list (EConstr.of_rel_context (Context.Rel.of_list arity)))) [|make_annot Anonymous indr|] in
           let p = (pnas, lift (Array.length pnas) t) in
           let c = mkCase (ci, u, Array.of_list params, (p, get_relevance decl), NoInvert, mkApp (c, args), br) in
           Some (sigma, it_mkLambda_or_LetIn c sign, it_mkProd_or_LetIn t sign)
@@ -2744,7 +2745,7 @@ let specialize (c,lbind) ipat =
       let subst = Esubst.subs_lift subst in
       instantiate sigma env subst accu decls
     in
-    let sigma, subst, nctx, holes = instantiate sigma env (Esubst.subs_id 0) [] (List.rev ctx) in
+    let sigma, subst, nctx, holes = instantiate sigma env (Esubst.subs_id 0) [] (Context.Rel.to_list (Context.Rel.rev ctx)) in
     let nty = Vars.esubst Vars.lift_substituend subst ty in
     (* Solve holes with the provided bindings *)
     let unify sigma n c =
@@ -2776,7 +2777,7 @@ let specialize (c,lbind) ipat =
       rebuild rels ctx c ty
     in
     let rels = Int.Set.union (free_rels sigma nc) (free_rels sigma nty) in
-    let nc, nty = rebuild rels nctx nc nty in
+    let nc, nty = rebuild rels (Context.Rel.to_list nctx) nc nty in
     sigma, nc, nty
   in
   let tac =
@@ -2874,7 +2875,7 @@ let specialize_eqs id =
             let pt = mkApp (eq, [| eqty; c; c |]) in
             let ind = destInd !evars eq in
             let p = mkApp (mkConstructUi (ind,0), [| eqty; c |]) in
-              if unif (push_rel_context ctx env) evars pt t then
+              if unif (push_rel_context (Context.Rel.of_list ctx) env) evars pt t then
                 aux true ctx (mkApp (acc, [| p |])) (subst1 p b)
               else acc, in_eqs, ctx, ty
         | App (heq, [| eqty; x; eqty'; y |]) when isRefX env !evars (Lazy.force rocq_heq_ref) heq ->
@@ -2882,26 +2883,26 @@ let specialize_eqs id =
             let pt = mkApp (heq, [| eqt; c; eqt; c |]) in
             let ind = destInd !evars heq in
             let p = mkApp (mkConstructUi (ind,0), [| eqt; c |]) in
-              if unif (push_rel_context ctx env) evars pt t then
+              if unif (push_rel_context (Context.Rel.of_list ctx) env) evars pt t then
                 aux true ctx (mkApp (acc, [| p |])) (subst1 p b)
               else acc, in_eqs, ctx, ty
         | _ ->
             if in_eqs then acc, in_eqs, ctx, ty
             else
               let typeclass_candidate = Typeclasses.is_maybe_class_type env !evars t in
-              let sigma, e = Evarutil.new_evar ~typeclass_candidate (push_rel_context ctx env) !evars t in
+              let sigma, e = Evarutil.new_evar ~typeclass_candidate (push_rel_context (Context.Rel.of_list ctx) env) !evars t in
               evars := sigma;
                 aux false (LocalDef (na,e,t) :: ctx) (mkApp (lift 1 acc, [| mkRel 1 |])) b)
     | t -> acc, in_eqs, ctx, ty
   in
   let acc, worked, ctx, ty = aux false [] (mkVar id) ty in
-  let ctx' = nf_rel_context_evar !evars ctx in
+  let ctx' = Context.Rel.to_list (nf_rel_context_evar !evars (Context.Rel.of_list ctx)) in
   let ctx'' = List.map (function
     | LocalDef (n,k,t) when isEvar !evars k -> LocalAssum (n,t)
     | decl -> decl) ctx'
   in
-  let ty' = it_mkProd_or_LetIn ty ctx'' in
-  let acc' = it_mkLambda_or_LetIn acc ctx'' in
+  let ty' = it_mkProd_or_LetIn ty (Context.Rel.of_list ctx'') in
+  let acc' = it_mkLambda_or_LetIn acc (Context.Rel.of_list ctx'') in
   let ty' = Tacred.whd_simpl env !evars ty'
   and acc' = Tacred.whd_simpl env !evars acc' in
   let ty' = Evarutil.nf_evar !evars ty' in

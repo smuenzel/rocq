@@ -153,7 +153,7 @@ let is_recursive mie =
     | _ -> false
   in
   let nind = List.length mie.mind_entry_inds in
-  let nparams = List.length mie.mind_entry_params in
+  let nparams = Context.Rel.length mie.mind_entry_params in
   List.exists (fun ind -> List.exists (fun t -> is_recursive_constructor (nparams+1) nind t) ind.mind_entry_lc) mie.mind_entry_inds
 
 let explain_not_prim_record reason =

@@ -205,7 +205,7 @@ let subst_class (subst,cl) =
   let do_subst_con c = Mod_subst.subst_constant subst c
   and do_subst c = Mod_subst.subst_mps subst c
   and do_subst_gr gr = fst (subst_global subst gr) in
-  let do_subst_ctx = List.Smart.map (RelDecl.map_constr do_subst) in
+  let do_subst_ctx ctx = Context.Rel.of_list (List.Smart.map (RelDecl.map_constr do_subst) (Context.Rel.to_list ctx)) in
   let do_subst_meth m =
     let c = Option.Smart.map do_subst_con m.meth_const in
     if c == m.meth_const then m
@@ -229,8 +229,10 @@ let discharge_class cl =
   try
     let info = Global.section_segment_of_reference cl.cl_impl in
     let info, _, cl_univs' = Cooking.lift_poly_univs info cl.cl_univs in
-    let nprops = List.length cl.cl_props in
-    let props, context = List.chop nprops (Discharge.cook_rel_context info (cl.cl_props @ cl.cl_context)) in
+    let nprops = Context.Rel.length cl.cl_props in
+    let props_list, context_list = List.chop nprops (Context.Rel.to_list (Discharge.cook_rel_context info (Context.Rel.append cl.cl_props cl.cl_context))) in
+    let props = Context.Rel.of_list props_list in
+    let context = Context.Rel.of_list context_list in
     let discharge_proj x = x in
     { cl_univs = cl_univs';
       cl_impl = cl.cl_impl;
@@ -320,17 +322,17 @@ let declare_instance_constant iinfo global impargs ?hook (name:lident) udecl pol
   instance_hook iinfo global ?hook kn
 
 let instance_type cl args =
-  let lenpars = List.count is_local_assum cl.clu_context in
+  let lenpars = List.count is_local_assum (Context.Rel.to_list cl.clu_context) in
   let pars = List.firstn lenpars args in
   applist (mkRef (cl.clu_impl,cl.clu_univs), pars)
 
 let do_declare_instance sigma ~locality ~poly k ctx ctx' pri udecl impargs subst (name:lident) =
   let subst = List.fold_left2
       (fun subst' s decl -> if is_local_assum decl then s :: subst' else subst')
-      [] subst k.clu_context
+      [] subst (Context.Rel.to_list k.clu_context)
   in
   let ty_constr = instance_type k subst in
-  let termtype = it_mkProd_or_LetIn ty_constr (ctx' @ ctx) in
+  let termtype = it_mkProd_or_LetIn ty_constr (Context.Rel.of_list (ctx' @ ctx)) in
   let sigma, entry = Declare.prepare_parameter ~poly sigma ~udecl ~types:termtype in
   let cst = Declare.declare_constant ?loc:name.loc ~name:name.v
       ~kind:Decls.(IsAssumption Logical) (Declare.ParameterEntry entry) in
@@ -405,7 +407,7 @@ let do_instance_subst_constructor_and_ty subst k ctx =
   let subst =
     List.fold_left2 (fun subst' s decl ->
       if is_local_assum decl then s :: subst' else subst')
-    [] subst (k.clu_props @ k.clu_context)
+    [] subst (Context.Rel.to_list k.clu_props @ Context.Rel.to_list k.clu_context)
   in
   let ty_constr = instance_type k subst in
   let app = instance_constructor k subst in
@@ -447,7 +449,7 @@ let do_instance_type_ctx_instance props k env' ctx' sigma ~program_mode subst =
            with Not_found ->
              ((CAst.make @@ CHole (None)) :: props), rest
          else props, rest)
-      ([], props) k.clu_props
+      ([], props) (Context.Rel.to_list k.clu_props)
   in
   match rest with
   | (n, _) :: _ ->
@@ -455,7 +457,7 @@ let do_instance_type_ctx_instance props k env' ctx' sigma ~program_mode subst =
   | [] ->
     let sigma, res =
       type_ctx_instance ~program_mode
-        (push_rel_context ctx' env') sigma k.clu_props props subst in
+        (push_rel_context ctx' env') sigma (Context.Rel.to_list k.clu_props) props subst in
     res, sigma
 
 let interp_props ~program_mode env' cty k ctx ctx' subst sigma = function
@@ -463,13 +465,13 @@ let interp_props ~program_mode env' cty k ctx ctx' subst sigma = function
     check_duplicate ?loc fs;
     let subst, sigma = do_instance_type_ctx_instance fs k env' ctx' sigma ~program_mode subst in
     let term, termtype =
-      do_instance_subst_constructor_and_ty subst k (ctx' @ ctx) in
+      do_instance_subst_constructor_and_ty subst k (Context.Rel.of_list (Context.Rel.to_list ctx' @ ctx)) in
     term, termtype, sigma
   | (_, term) ->
     let sigma, def =
       interp_casted_constr_evars ~program_mode env' sigma term cty in
-    let termtype = it_mkProd_or_LetIn cty ctx in
-    let term = it_mkLambda_or_LetIn def ctx in
+    let termtype = it_mkProd_or_LetIn cty (Context.Rel.of_list ctx) in
+    let term = it_mkLambda_or_LetIn def (Context.Rel.of_list ctx) in
     term, termtype, sigma
 
 let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx ctx' pri decl imps subst id opt_props =
@@ -481,10 +483,10 @@ let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx 
       let term, termtype =
         if k.clu_trivial then
           let term, termtype =
-            do_instance_subst_constructor_and_ty subst k (ctx' @ ctx) in
+            do_instance_subst_constructor_and_ty subst k (Context.Rel.of_list (Context.Rel.to_list ctx' @ ctx)) in
           Some term, termtype
         else
-          None, it_mkProd_or_LetIn cty ctx
+          None, it_mkProd_or_LetIn cty (Context.Rel.of_list ctx)
       in
       let termtype, sigma = do_instance_resolve_TC ~poly termtype sigma env in
       term, termtype, sigma
@@ -511,7 +513,7 @@ let do_instance_program ~pm env env' sigma ?hook ~locality ~poly cty k ctx ctx' 
       let subst, sigma =
         do_instance_type_ctx_instance [] k env' ctx' sigma ~program_mode:true subst in
       let term, termtype =
-        do_instance_subst_constructor_and_ty subst k (ctx' @ ctx) in
+        do_instance_subst_constructor_and_ty subst k (Context.Rel.of_list (Context.Rel.to_list ctx' @ ctx)) in
       term, termtype, sigma in
   let termtype, sigma = do_instance_resolve_TC ~poly termtype sigma env in
   if not (Evd.has_undefined sigma) && not (Option.is_empty opt_props) then
@@ -547,7 +549,7 @@ let interp_instance_context ~program_mode ~poly env ctx pl tclass =
   let sigma, (c', imps') = interp_type_evars_impls ~flags ~impls env' sigma tclass in
   let imps = imps @ imps' in
   let ctx', c = decompose_prod_decls sigma c' in
-  let ctx'' = ctx' @ ctx in
+  let ctx'' = Context.Rel.append ctx' ctx in
   let (k, u), args = Typeclasses.dest_class_app (push_rel_context ctx'' env) sigma c in
   let cl = typeclass_univ_instance env (k, u) in
   let args = List.map of_constr args in
@@ -556,7 +558,7 @@ let interp_instance_context ~program_mode ~poly env ctx pl tclass =
         match decl with
         | LocalAssum _ -> (List.tl args, List.hd args :: args')
         | LocalDef (_,b,_) -> (args, Vars.substl args' b :: args'))
-      cl.clu_context (args, [])
+      (Context.Rel.to_list cl.clu_context) (args, [])
   in
   let sigma = Evarutil.nf_evar_map sigma in
   let sigma = resolve_typeclasses ~filter:Typeclasses.all_evars ~fail:true env sigma in
@@ -593,7 +595,7 @@ let new_instance_interactive ~locality ~poly instid ctx cl
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     new_instance_common ~program_mode:false ~poly env instid ctx cl in
   id, do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly
-    cty k ctx ctx' pri decl imps subst id opt_props
+    cty k (Context.Rel.to_list ctx) ctx' pri decl imps subst id opt_props
 
 let new_instance_program ~locality ~pm ~poly instid ctx cl opt_props ?hook pri =
   let env = Global.env() in
@@ -601,7 +603,7 @@ let new_instance_program ~locality ~pm ~poly instid ctx cl opt_props ?hook pri =
     new_instance_common ~program_mode:true ~poly env instid ctx cl in
   let pm =
     do_instance_program ~pm env env' sigma ?hook ~locality ~poly
-      cty k ctx ctx' pri decl imps subst id opt_props in
+      cty k (Context.Rel.to_list ctx) ctx' pri decl imps subst id opt_props in
   pm, id
 
 let new_instance ~locality ~poly instid ctx cl props ?hook pri =
@@ -609,7 +611,7 @@ let new_instance ~locality ~poly instid ctx cl props ?hook pri =
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     new_instance_common ~program_mode:false ~poly env instid ctx cl in
   do_instance env env' sigma ?hook ~locality ~poly
-    cty k ctx ctx' pri decl imps subst id props;
+    cty k (Context.Rel.to_list ctx) ctx' pri decl imps subst id props;
   id
 
 let declare_new_instance ~locality ~program_mode ~poly instid ctx cl pri =
@@ -618,7 +620,7 @@ let declare_new_instance ~locality ~program_mode ~poly instid ctx cl pri =
   let sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     interp_instance_context ~program_mode ~poly env ctx pl cl
   in
-  do_declare_instance sigma ~locality ~poly k ctx ctx' pri decl imps subst instid
+  do_declare_instance sigma ~locality ~poly k (Context.Rel.to_list ctx) (Context.Rel.to_list ctx') pri decl imps subst instid
 
 let refine_att =
   let open Attributes in

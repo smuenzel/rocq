@@ -548,7 +548,7 @@ let ssr_is_setoid env =
   | Some srel ->
   fun sigma r args ->
     Rewrite.is_applied_rewrite_relation env
-      sigma [] (EConstr.mkApp (r, args)) <> None
+      sigma Context.Rel.empty (EConstr.mkApp (r, args)) <> None
 
 let closed0_check env sigma cl p =
   if EConstr.Vars.closed0 sigma cl then

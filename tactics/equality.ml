@@ -582,7 +582,7 @@ let general_rewrite ~where:cls ~l2r:lft2rgt occs ~freeze:frzevars ~dep:dep_proof
                     | Some (hdcncl,args) ->
                   let lft2rgt = adjust_rewriting_direction args lft2rgt in
                   leibniz_rewrite_ebindings_clause cls lft2rgt tac c
-                    (rels' @ rels, hdcncl, args) l with_evars frzevars dep_proof_ok
+                    (Context.Rel.append rels' rels, hdcncl, args) l with_evars frzevars dep_proof_ok
                     | None -> Proofview.tclZERO ~info e
             (* error "The provided term does not end with an equality or a declared rewrite relation." *)
             end

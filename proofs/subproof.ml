@@ -77,16 +77,16 @@ let () = CErrors.register_handler begin function
 | _ -> None
 end
 
-let rec shrink ctx sign c t accu =
+let shrink ctx sign c t accu =
   let open Constr in
   let open Vars in
-  match ctx, sign with
+  let rec shrink_aux ctx sign c t accu = match ctx, sign with
   | [], [] -> (c, t, accu)
   | p :: ctx, decl :: sign ->
     if noccurn 1 c && noccurn 1 t then
       let c = subst1 mkProp c in
       let t = subst1 mkProp t in
-      shrink ctx sign c t accu
+      shrink_aux ctx sign c t accu
     else
       let c = Term.mkLambda_or_LetIn p c in
       let t = Term.mkProd_or_LetIn p t in
@@ -94,8 +94,10 @@ let rec shrink ctx sign c t accu =
         then EConstr.mkVar (NamedDecl.get_id decl) :: accu
         else accu
       in
-      shrink ctx sign c t accu
+      shrink_aux ctx sign c t accu
   | _ -> assert false
+  in
+  shrink_aux (Context.Rel.to_list ctx) sign c t accu
 
 (* If [sign] is [x1:T1..xn:Tn], [c] is [fun x1:T1..xn:Tn => c']
     and [t] is [forall x1:T1..xn:Tn, t'], returns a new [c'] and [t'],

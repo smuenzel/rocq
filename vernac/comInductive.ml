@@ -209,7 +209,7 @@ let compute_constructor_levels env evd sign =
       | LocalAssum _ ->
         let s = Retyping.get_sort_of env evd (RelDecl.get_type d) in
           (s :: lev, EConstr.push_rel d env))
-    sign ([],env))
+    (Context.Rel.to_list sign) ([],env))
 
 let is_flexible_sort evd s =
   let s = ESorts.kind evd s in
@@ -651,17 +651,17 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
      We also need to restrict to avoid seeing spurious bounds from below
      (ie v <= template_u with v getting restricted away). *)
   let sigma = Evd.minimize_universes_no_collapse sigma in
-  let sigma = restrict_inductive_universes sigma ctx_params arities constructors in
+  let sigma = restrict_inductive_universes sigma (Context.Rel.to_list ctx_params) arities constructors in
 
   let sigma, univ_entry, ubinders, global_univs =
     inductive_univs sigma ~user_template:template ~poly udecl
-      ~indnames ~ctx_params ~arities ~constructors template_syntax
+      ~indnames ~ctx_params:(Context.Rel.to_list ctx_params) ~arities ~constructors template_syntax
   in
 
   (* evar-normalize *)
   let arities = List.map EConstr.(to_constr sigma) arities in
   let constructors = List.map (on_snd (List.map (EConstr.to_constr sigma))) constructors in
-  let ctx_params = List.map (fun d -> EConstr.to_rel_decl sigma d) ctx_params in
+  let ctx_params = List.map (fun d -> EConstr.to_rel_decl sigma d) (Context.Rel.to_list ctx_params) in
 
   (* Build the inductive entries *)
   let entries = List.map3 (fun indname arity (cnames,ctypes) ->
@@ -675,7 +675,7 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
   let variance = variance_of_entry ~cumulative:(PolyFlags.cumulative poly) ~variances univ_entry in
   (* Build the mutual inductive entry *)
   let mind_ent =
-    { mind_entry_params = ctx_params;
+    { mind_entry_params = Context.Rel.of_list ctx_params;
       mind_entry_record = None;
       mind_entry_finite = finite;
       mind_entry_inds = entries;
@@ -801,7 +801,7 @@ let interp_mutual_inductive_gen env0 ~flags udecl (uparamsl,paramsl,indl) notati
       (cnames,List.map generalize_constructor ctypes))
       constructors
   in
-  let ctx_params = ctx_params @ ctx_uparams in
+  let ctx_params = Context.Rel.to_list ctx_params @ Context.Rel.to_list ctx_uparams in
   let userimpls = useruimpls @ userimpls in
   let indimpls = List.map (fun iimpl -> useruimpls @ iimpl) indimpls in
   let fullarities = List.map (fun c -> EConstr.it_mkProd_or_LetIn c ctx_uparams) fullarities in
@@ -815,7 +815,7 @@ let interp_mutual_inductive_gen env0 ~flags udecl (uparamsl,paramsl,indl) notati
       indimpls cimpls
   in
   let arities_explicit = List.map (fun ar -> ar.ind_arity_explicit) indl in
-  let default_dep_elim, mie, binders, ctx = interp_mutual_inductive_constr ~flags ~sigma ~ctx_params ~udecl ~variances ~arities_explicit ~arities ~template_syntax ~constructors ~env_ar ~private_ind ~indnames in
+  let default_dep_elim, mie, binders, ctx = interp_mutual_inductive_constr ~flags ~sigma ~ctx_params:(Context.Rel.of_list ctx_params) ~udecl ~variances ~arities_explicit ~arities ~template_syntax ~constructors ~env_ar ~private_ind ~indnames in
   (default_dep_elim, mie, binders, impls, ctx)
 
 
@@ -973,7 +973,7 @@ let make_cases ind =
   let mib, mip = Global.lookup_inductive ind in
   Util.Array.fold_right_i
     (fun i (ctx, _) l ->
-       let al = Util.List.skipn (List.length mib.mind_params_ctxt) (List.rev ctx) in
+       let al = Util.List.skipn (Context.Rel.length mib.mind_params_ctxt) (List.rev (Context.Rel.to_list ctx)) in
        let rec rename avoid = function
          | [] -> []
          | RelDecl.LocalDef _ :: l -> "_" :: rename avoid l

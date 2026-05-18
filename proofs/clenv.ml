@@ -867,7 +867,7 @@ let treat_case env sigma ci lbrty accu ~parent =
   let open EConstr in
   let fold (sigma, accu) (name, ctx, ty) =
     let open Context.Rel.Declaration in
-    let brctx = Array.of_list (List.rev_map get_annot ctx) in
+    let brctx = Array.of_list (List.rev_map get_annot (Context.Rel.to_list ctx)) in
     let args = Context.Rel.instance mkRel 0 ctx in
     (* TODO: tweak this to prevent dummy β-cuts *)
     let ty = nf_betaiota env sigma (it_mkProd_or_LetIn ty ctx) in
@@ -968,7 +968,7 @@ let build_case_analysis env sigma (ind, u) params pred indices indarg dep knd =
     let arsign = get_arity env indf in
     let r = Inductiveops.relevance_of_inductive_family env indf in
     let depind = build_dependent_inductive env indf in
-    let deparsign = LocalAssum (make_annot Anonymous r,depind)::arsign in
+    let deparsign = LocalAssum (make_annot Anonymous r,depind)::Context.Rel.to_list arsign in
     let set_names env l =
       let ident_hd env ids t na =
         let na = Namegen.named_hd env (Evd.from_env env) t na in
@@ -995,8 +995,8 @@ let build_case_analysis env sigma (ind, u) params pred indices indarg dep knd =
     let pbody =
       mkApp
         (pred,
-          if dep then Context.Rel.instance mkRel 0 deparsign
-          else Context.Rel.instance mkRel 1 (List.tl deparsign)) in
+          if dep then Context.Rel.instance mkRel 0 (Context.Rel.of_list deparsign)
+          else Context.Rel.instance mkRel 1 (Context.Rel.of_list (List.tl deparsign))) in
     let iv =
       if Inductiveops.Internal.should_invert_case env sigma (ERelevance.kind sigma relevance) ci
       then CaseInvert { indices = indices }

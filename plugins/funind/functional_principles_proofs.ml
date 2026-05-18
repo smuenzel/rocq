@@ -220,7 +220,7 @@ let change_eq env sigma hyp_id (context : rel_context) x t end_of_type =
       (fun end_of_type (i, t) -> liftn 1 i (substnl [t] (i - 1) end_of_type))
       end_of_type_with_pop sub
   in
-  let old_context_length = List.length context + 1 in
+  let old_context_length = Context.Rel.length context + 1 in
   let witness_fun =
     mkLetIn
       ( make_annot Anonymous ERelevance.relevant
@@ -250,7 +250,7 @@ let change_eq env sigma hyp_id (context : rel_context) x t end_of_type =
           , mkLambda_or_LetIn decl witness_fun ))
       1
       (new_end_of_type, 0, witness_fun)
-      context
+      (Context.Rel.to_list context)
   in
   let new_type_of_hyp = Reductionops.nf_betaiota env sigma new_type_of_hyp in
   let new_ctxt, new_end_of_type =
@@ -356,7 +356,7 @@ let clean_hyp_with_heq ptes_infos eq_hyps hyp_id env sigma =
       in
       (* length of context didn't change ? *)
       let new_context, new_typ_of_hyp =
-        decompose_prod_n_decls sigma (List.length context) reduced_type_of_hyp
+        decompose_prod_n_decls sigma (Context.Rel.length context) reduced_type_of_hyp
       in
       tclTHENLIST
         [ h_reduce_with_zeta (Locusops.onHyp hyp_id)
@@ -372,7 +372,7 @@ let clean_hyp_with_heq ptes_infos eq_hyps hyp_id env sigma =
         let popped_t' = pop t' in
         let real_type_of_hyp = it_mkProd_or_LetIn popped_t' context in
         let prove_new_type_of_hyp =
-          let context_length = List.length context in
+          let context_length = Context.Rel.length context in
           tclTHENLIST
             [ tclDO context_length intro
             ; Proofview.Goal.enter (fun g ->
@@ -417,7 +417,7 @@ let clean_hyp_with_heq ptes_infos eq_hyps hyp_id env sigma =
         let popped_t' = pop t' in
         let real_type_of_hyp = it_mkProd_or_LetIn popped_t' context in
         let prove_trivial =
-          let nb_intro = List.length context in
+          let nb_intro = Context.Rel.length context in
           tclTHENLIST
             [ tclDO nb_intro intro
             ; Proofview.Goal.enter (fun g ->
@@ -451,7 +451,7 @@ let clean_hyp_with_heq ptes_infos eq_hyps hyp_id env sigma =
         tclTHENLIST
           [ change_hyp_with_using "prove_trivial_eq" hyp_id real_type_of_hyp
               ((* observe_tac "prove_trivial_eq" *)
-               prove_trivial_eq hyp_id context (get_args hd args))
+               prove_trivial_eq hyp_id (Context.Rel.to_list context) (get_args hd args))
           ; scan_type context popped_t' ]
       else
         try
@@ -461,10 +461,10 @@ let clean_hyp_with_heq ptes_infos eq_hyps hyp_id env sigma =
           tclTHEN tac (scan_type new_context new_t')
         with NoChange ->
           (* Last thing todo : push the rel in the context and continue *)
-          scan_type (LocalAssum (x, t_x) :: context) t'
+          scan_type (Context.Rel.of_list (LocalAssum (x, t_x) :: Context.Rel.to_list context)) t'
     else tclIDTAC
   in
-  try (scan_type [] (Typing.type_of_variable env hyp_id), [hyp_id])
+  try (scan_type Context.Rel.empty (Typing.type_of_variable env hyp_id), [hyp_id])
   with TOREMOVE -> (thin [hyp_id], [])
 
 let clean_goal_with_heq ptes_infos continue_tac (dyn_infos : body_info) =
@@ -995,10 +995,10 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
       let fresh_decl = RelDecl.map_name fresh_id in
       let princ_info : elim_scheme =
         { princ_info with
-          params = List.map fresh_decl princ_info.params
-        ; predicates = List.map fresh_decl princ_info.predicates
-        ; branches = List.map fresh_decl princ_info.branches
-        ; args = List.map fresh_decl princ_info.args }
+          params = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.params))
+        ; predicates = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.predicates))
+        ; branches = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.branches))
+        ; args = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.args)) }
       in
       let get_body const =
         let env = Global.env () in
@@ -1018,7 +1018,7 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
       let full_params, princ_params, fbody_with_full_params =
         if diff_params > 0 then
           let princ_params, full_params =
-            list_chop diff_params princ_info.params
+            list_chop diff_params (Context.Rel.to_list princ_info.params)
           in
           ( full_params
           , (* real params *)
@@ -1030,12 +1030,12 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
         else
           let f_ctxt_other, f_ctxt_params = list_chop (-diff_params) f_ctxt in
           let f_body = compose_lam f_ctxt_other f_body in
-          ( princ_info.params
+          ( Context.Rel.to_list princ_info.params
           , (* real params *)
             []
           , (* all params are full params *)
             substl (* function instantiated with real params *)
-              (List.map var_of_decl princ_info.params)
+              (List.map var_of_decl (Context.Rel.to_list princ_info.params))
               f_body )
       in
       observe
@@ -1098,7 +1098,7 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
                 let f =
                   applist
                     ( mkConst fnames.(i)
-                    , List.rev_map var_of_decl princ_info.params )
+                    , List.rev_map var_of_decl (Context.Rel.to_list princ_info.params) )
                 in
                 let first_args =
                   Array.init nargs (fun i -> mkRel (nargs - i))
@@ -1137,7 +1137,7 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
                 ( Id.Map.add (Nameops.Name.get_id pte) info acc_map
                 , info :: acc_info ))
               0 (Id.Map.empty, [])
-              (List.rev princ_info.predicates)
+              (Context.Rel.to_list (Context.Rel.rev princ_info.predicates))
           in
           (pte_to_fix, List.rev rev_info)
         | _ -> (Id.Map.empty, [])
@@ -1168,13 +1168,13 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
         (* names are already refreshed *)
         tclTHENLIST
           [ observe_tac "introducing params"
-              (intros_mustbe_force (List.rev_map id_of_decl princ_info.params))
+              (intros_mustbe_force (List.rev_map id_of_decl (Context.Rel.to_list princ_info.params)))
           ; observe_tac "introducing predicates"
               (intros_mustbe_force
-                 (List.rev_map id_of_decl princ_info.predicates))
+                 (List.rev_map id_of_decl (Context.Rel.to_list princ_info.predicates)))
           ; observe_tac "introducing branches"
               (intros_mustbe_force
-                 (List.rev_map id_of_decl princ_info.branches))
+                 (List.rev_map id_of_decl (Context.Rel.to_list princ_info.branches)))
           ; observe_tac "building fixes" mk_fixes ]
       in
       let intros_after_fixes : unit Proofview.tactic =
@@ -1242,10 +1242,10 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
                            (*                         ); *)
                            (* observe_tac "instancing" *)
                            instantiate_hyps_with_args prove_tac
-                             (List.rev_map id_of_decl princ_info.branches)
+                             (List.rev_map id_of_decl (Context.Rel.to_list princ_info.branches))
                              (List.rev args_id)) ]) ]
             with Not_found ->
-              let nb_args = min princ_info.nargs (List.length ctxt) in
+              let nb_args = min princ_info.nargs (Context.Rel.length ctxt) in
               tclTHENLIST
                 [ tclDO nb_args intro
                 ; Proofview.Goal.enter (fun g ->
@@ -1291,7 +1291,7 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
                                do_prove dyn_infos
                            in
                            instantiate_hyps_with_args prove_tac
-                             (List.rev_map id_of_decl princ_info.branches)
+                             (List.rev_map id_of_decl (Context.Rel.to_list princ_info.branches))
                              (List.rev args_id)) ]) ])
       in
       tclTHEN first_tac intros_after_fixes)
@@ -1435,10 +1435,10 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
       let fresh_decl = map_name fresh_id in
       let princ_info : elim_scheme =
         { princ_info with
-          params = List.map fresh_decl princ_info.params
-        ; predicates = List.map fresh_decl princ_info.predicates
-        ; branches = List.map fresh_decl princ_info.branches
-        ; args = List.map fresh_decl princ_info.args }
+          params = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.params))
+        ; predicates = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.predicates))
+        ; branches = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.branches))
+        ; args = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.args)) }
       in
       let wf_tac =
         if is_mes then fun b ->
@@ -1456,7 +1456,7 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
       (*           str "real_rec_arg_num := " ++ int real_rec_arg_num ++ fnl () ++ *)
       (*           str "npost_rec_arg := " ++ int npost_rec_arg ); *)
       let post_rec_arg, pre_rec_arg =
-        Util.List.chop npost_rec_arg princ_info.args
+        Util.List.chop npost_rec_arg (Context.Rel.to_list princ_info.args)
       in
       let rec_arg_id =
         match List.rev post_rec_arg with
@@ -1470,7 +1470,7 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
       let subst_constrs =
         List.map
           (get_name %> Nameops.Name.get_id %> mkVar)
-          (pre_rec_arg @ princ_info.params)
+          (pre_rec_arg @ Context.Rel.to_list princ_info.params)
       in
       let relation = substl subst_constrs relation in
       let input_type = substl subst_constrs rec_arg_type in
@@ -1500,7 +1500,7 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
                 (mkApp (mkVar wf_thm_id, [|mkVar rec_arg_id|]))))
       in
       let args_ids =
-        List.map (get_name %> Nameops.Name.get_id) princ_info.args
+        List.map (get_name %> Nameops.Name.get_id) (Context.Rel.to_list princ_info.args)
       in
       let lemma =
         match !tcc_lemma_ref with
@@ -1548,8 +1548,8 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
         ; h_intros
             (List.rev_map
                (get_name %> Nameops.Name.get_id)
-               ( princ_info.args @ princ_info.branches @ princ_info.predicates
-               @ princ_info.params ))
+               ( Context.Rel.to_list princ_info.args @ Context.Rel.to_list princ_info.branches @ Context.Rel.to_list princ_info.predicates
+               @ Context.Rel.to_list princ_info.params ))
         ; assert_by (Name acc_rec_arg_id)
             (mkApp
                ( delayed_force acc_rel
@@ -1582,7 +1582,7 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
                 lazy (mkApp (Lazy.force acc_inv, [|mkVar acc_rec_arg_id|]))
               in
               let predicates_names =
-                List.map (get_name %> Nameops.Name.get_id) princ_info.predicates
+                List.map (get_name %> Nameops.Name.get_id) (Context.Rel.to_list princ_info.predicates)
               in
               let pte_info =
                 { proving_tac =
@@ -1598,7 +1598,7 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
                         ( !tcc_list
                         @ List.map
                             (get_name %> Nameops.Name.get_id)
-                            (princ_info.args @ princ_info.params)
+                            (Context.Rel.to_list princ_info.args @ Context.Rel.to_list princ_info.params)
                         @ [acc_rec_arg_id] )
                         eqs)
                 ; is_valid =
@@ -1615,5 +1615,5 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
               in
               (* observe_tac "instantiate_hyps_with_args"  *)
               instantiate_hyps_with_args make_proof
-                (List.map (get_name %> Nameops.Name.get_id) princ_info.branches)
+                (List.map (get_name %> Nameops.Name.get_id) (Context.Rel.to_list princ_info.branches))
                 (List.rev args_ids)) ])

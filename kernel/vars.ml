@@ -199,13 +199,13 @@ type instance_list = Constr.t list
 let subst_of_rel_context_instance_list sign l =
   let rec aux subst sign l =
     let open RelDecl in
-    match sign, l with
-    | LocalAssum _ :: sign', a::args' -> aux (a::subst) sign' args'
+    match Context.Rel.to_list sign, l with
+    | LocalAssum _ :: sign', a::args' -> aux (a::subst) (Context.Rel.of_list sign') args'
     | LocalDef (_,c,_)::sign', args' ->
-        aux (substl subst c :: subst) sign' args'
+        aux (substl subst c :: subst) (Context.Rel.of_list sign') args'
     | [], [] -> subst
     | _ -> CErrors.anomaly (Pp.str "Instance and signature do not match.")
-  in aux [] (List.rev sign) l
+  in aux [] (Context.Rel.rev sign) l
 
 let subst_of_rel_context_instance sign v =
   subst_of_rel_context_instance_list sign (Array.to_list v)
@@ -213,9 +213,9 @@ let subst_of_rel_context_instance sign v =
 let adjust_rel_to_rel_context sign n =
   let rec aux sign =
     let open RelDecl in
-    match sign with
-    | LocalAssum _ :: sign' -> let (n',p) = aux sign' in (n'+1,p)
-    | LocalDef (_,_c,_)::sign' -> let (n',p) = aux sign' in (n'+1,if n'<n then p+1 else p)
+    match Context.Rel.to_list sign with
+    | LocalAssum _ :: sign' -> let (n',p) = aux (Context.Rel.of_list sign') in (n'+1,p)
+    | LocalDef (_,_c,_)::sign' -> let (n',p) = aux (Context.Rel.of_list sign') in (n'+1,if n'<n then p+1 else p)
     | [] -> (0,n)
   in snd (aux sign)
 
@@ -264,12 +264,12 @@ let subst_vars subst c = substn_vars 1 subst c
 let smash_rel_context sign =
   let open Context.Rel.Declaration in
   let open Esubst in
-  snd (List.fold_right
+  snd (Context.Rel.fold_outside
     (fun decl (subst, sign) ->
        match get_value decl with
        | Some b -> (subs_cons (make_substituend (esubst lift_substituend subst b)) subst, sign)
-       | None -> (subs_lift subst, map_constr (esubst lift_substituend subst) decl :: sign))
-    sign (subs_id 0, []))
+       | None -> (subs_lift subst, Context.Rel.add (map_constr (esubst lift_substituend subst) decl) sign))
+    sign ~init:(subs_id 0, Context.Rel.empty))
 
 (** Universe substitutions *)
 open Constr
@@ -412,10 +412,7 @@ let subst_univs_level_constr subst c =
       if !changed then c' else c
 
 let subst_univs_level_context s ctx =
-  CList.Smart.map (fun d ->
-      let d = RelDecl.map_relevance (UVars.subst_sort_level_relevance s) d in
-      RelDecl.map_constr (subst_univs_level_constr s) d)
-    ctx
+  Context.Rel.map_with_relevance (UVars.subst_sort_level_relevance s) (subst_univs_level_constr s) ctx
 
 let subst_instance_constr subst c =
   if UVars.Instance.is_empty subst then c
@@ -473,10 +470,7 @@ let univ_instantiate_constr u c =
 let subst_instance_context s ctx =
   if UVars.Instance.is_empty s then ctx
   else
-    CList.Smart.map (fun d ->
-        let d = RelDecl.map_relevance (UVars.subst_instance_relevance s) d in
-        RelDecl.map_constr (subst_instance_constr s) d)
-      ctx
+    Context.Rel.map_with_relevance (UVars.subst_instance_relevance s) (subst_instance_constr s) ctx
 
 type ('a,'s,'u,'r) univ_visitor = {
   visit_sort : 'a -> 's -> 'a;

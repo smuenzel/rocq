@@ -1175,7 +1175,7 @@ let extract_prim env ml_of l =
   let cond = ref [] in
   let type_args p =
     let params, args_ty, _ = CPrimitives.types p in
-    List.length params, Array.of_list args_ty in
+    Context.Rel.length params, Array.of_list args_ty in
   let rec aux l =
     match node l with
     | Lprim (kn, p, args) ->
@@ -2146,7 +2146,7 @@ and apply_fv cenv env sigma univ (fv_named,fv_rel) auxdefs ml =
 and compile_rel cenv env sigma univ auxdefs n =
   let open Context.Rel.Declaration in
   let decl = lookup_rel n env in
-  let n = List.length (rel_context env) - n in
+  let n = Context.Rel.length (rel_context env) - n in
   match decl with
   | LocalDef (_,t,_) ->
       let code = lambda_of_constr env sigma t in

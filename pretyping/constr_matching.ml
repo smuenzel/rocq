@@ -368,8 +368,8 @@ let matches_core env sigma allow_bound_rels (binding_vars, pat) c =
     let n' = Context.Rel.length ctx_b2' in
     if Vars.noccur_between sigma 1 n b2 && Vars.noccur_between sigma 1 n' b2' then
       let f l (LocalAssum (na,t) | LocalDef (na,_,t)) = push_binder Anonymous na t l in
-      let ctx_br = List.fold_left f ctx ctx_b2 in
-      let ctx_br' = List.fold_left f ctx ctx_b2' in
+      let ctx_br = List.fold_left f ctx (Context.Rel.to_list ctx_b2) in
+      let ctx_br' = List.fold_left f ctx (Context.Rel.to_list ctx_b2') in
       let b1 = lift_pattern n b1 and b1' = lift_pattern n' b1' in
       sorec ctx_br' (push_rel_context ctx_b2' env)
         (sorec ctx_br (push_rel_context ctx_b2 env)
@@ -407,7 +407,7 @@ let matches_core env sigma allow_bound_rels (binding_vars, pat) c =
       | _, [] ->
         assert false
       in
-      let ctx, subst = fold (ctx, subst) (Array.to_list n) (List.rev decls) in
+      let ctx, subst = fold (ctx, subst) (Array.to_list n) (List.rev (Context.Rel.to_list decls)) in
       sorec ctx env subst c1 c2
     in
     let chk_branch subst (j,n,c) =

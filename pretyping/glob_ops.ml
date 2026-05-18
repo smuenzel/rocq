@@ -591,7 +591,8 @@ open Context
 
 (* Keep only patterns which are not bound to a local definitions *)
 let drop_local_defs params decls args =
-    let decls = List.skipn (Rel.length params) (List.rev decls) in
+    let decls = Context.Rel.to_list decls in
+    let decls = List.skipn (Context.Rel.length params) (List.rev decls) in
     let rec aux decls args =
       match decls, args with
       | [], [] -> []

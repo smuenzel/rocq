@@ -471,7 +471,7 @@ let compute_mib_implicits flags kn =
           let r = (snd @@ Inductive.lookup_mind_specif env (kn,i)).mind_relevance in
           Context.Rel.Declaration.LocalAssum (Context.make_annot (Name mip.mind_typename) r, ty))
         mib.mind_packets) in
-  let env_ar = Environ.push_rel_context ar env in
+  let env_ar = Environ.push_rel_context (Context.Rel.of_list ar) env in
   let imps_one_inductive i mip =
     let ind = (kn,i) in
     let ar, _ = Typeops.type_of_global_in_context env (GlobRef.IndRef ind) in

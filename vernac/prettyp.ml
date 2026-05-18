@@ -124,7 +124,7 @@ let print_impargs_list prefix l =
 let need_expansion env impl ref =
   let typ, _ = Typeops.type_of_global_in_context env ref in
   let ctx = Term.prod_decls typ in
-  let nprods = List.count is_local_assum ctx in
+  let nprods = List.count is_local_assum (Context.Rel.to_list ctx) in
   not (List.is_empty impl) && List.length impl >= nprods &&
     let _,lastimpl = List.chop nprods impl in
       List.exists is_status_implicit lastimpl

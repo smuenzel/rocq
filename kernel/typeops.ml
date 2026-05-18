@@ -105,23 +105,23 @@ let instantiate_context env u subst nas ctx =
   let instantiate_relevance na =
     { na with binder_relevance = UVars.subst_instance_relevance u na.binder_relevance }
   in
-  let rec instantiate i ctx = match ctx with
-  | [] -> if 0 <= i then raise ArgumentsMismatch else []
+  let rec instantiate i ctx = match Context.Rel.to_list ctx with
+  | [] -> if 0 <= i then raise ArgumentsMismatch else Context.Rel.empty
   | LocalAssum (na, ty) :: ctx ->
-    let ctx = instantiate (pred i) ctx in
+    let ctx = instantiate (pred i) (Context.Rel.of_list ctx) in
     let subst = Esubst.subs_liftn i subst in
     let na = instantiate_relevance na in
     let ty = esubst u subst ty in
     let () = check_binding_relevance env na nas.(i) ty in
-    LocalAssum (nas.(i), ty) :: ctx
+    Context.Rel.add (LocalAssum (nas.(i), ty)) ctx
   | LocalDef (na, ty, bdy) :: ctx ->
-    let ctx = instantiate (pred i) ctx in
+    let ctx = instantiate (pred i) (Context.Rel.of_list ctx) in
     let subst = Esubst.subs_liftn i subst in
     let na = instantiate_relevance na in
     let ty = esubst u subst ty in
     let bdy = esubst u subst bdy in
     let () = check_binding_relevance env na nas.(i) ty in
-    LocalDef (nas.(i), ty, bdy) :: ctx
+    Context.Rel.add (LocalDef (nas.(i), ty, bdy)) ctx
   in
   instantiate (Array.length nas - 1) ctx
 
@@ -473,13 +473,13 @@ let check_branch_types env (_mib, mip) ci u pms c _ct lft (pctx, p) =
   in
   let iter i (brctx, brt, constrty) =
     let brenv = push_rel_context brctx env in
-    let nargs = List.length brctx in
+    let nargs = Context.Rel.length brctx in
     let pms = Array.map (fun c -> lift nargs c) pms in
     let cargs = Context.Rel.instance mkRel 0 brctx in
     let cstr = mkApp (mkConstructU ((ci.ci_ind, i + 1), u), Array.append pms cargs) in
     let (_, retargs) = find_rectype brenv constrty in
     let indices = List.lastn mip.mind_nrealargs retargs in
-    let subst = instantiate (List.rev pctx) (indices @ [cstr]) (Esubst.subs_shft (nargs, Esubst.subs_id 0)) in
+    let subst = instantiate (Context.Rel.to_list (Context.Rel.rev pctx)) (indices @ [cstr]) (Esubst.subs_shft (nargs, Esubst.subs_id 0)) in
     let expbrt = Vars.esubst Vars.lift_substituend subst p in
     match conv_leq brenv brt expbrt with
     | Result.Ok () -> ()
@@ -505,7 +505,7 @@ let should_invert_case env r ci =
   match Array.length mip.mind_nf_lc with
   | 0 -> true
   | 1 ->
-    List.length (fst mip.mind_nf_lc.(0)) = List.length mib.mind_params_ctxt
+    Context.Rel.length (fst mip.mind_nf_lc.(0)) = Context.Rel.length mib.mind_params_ctxt
   | _ -> false
 
 let type_case_scrutinee env (mib, _mip) (u', largs) u pms (pctx, p) c =
@@ -762,12 +762,12 @@ and execute_aux tbl env cstr =
         in
         let () = check_poly_constraints cst env in
         let paramsubst =
-          try type_of_parameters env params u pms pmst
+          try type_of_parameters env (Context.Rel.to_list params) u pms pmst
           with ArgumentsMismatch -> error_elim_arity env (ci.ci_ind, u) (self c) None
         in
         let (pctx, pt) =
           let (nas, p) = p in
-          let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
+          let realdecls, _ = List.chop mip.mind_nrealdecls (Context.Rel.to_list mip.mind_arity_ctxt) in
           let self =
             let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
             let inst = UVars.Instance.(abstract_instance (length u)) in
@@ -775,7 +775,7 @@ and execute_aux tbl env cstr =
           in
           let realdecls = LocalAssum (Context.make_annot Anonymous mip.mind_relevance, self) :: realdecls in
           let realdecls =
-            try instantiate_context env u paramsubst nas realdecls
+            try instantiate_context env u paramsubst nas (Context.Rel.of_list realdecls)
             with ArgumentsMismatch -> error_elim_arity env (ci.ci_ind, u) (HConstr.self c) None
           in
           let p_env = Environ.push_rel_context realdecls env in
@@ -789,7 +789,8 @@ and execute_aux tbl env cstr =
         in
         let build_one_branch i (nas, br) =
           let (ctx, cty) = mip.mind_nf_lc.(i) in
-          let ctx, _ = List.chop mip.mind_consnrealdecls.(i) ctx in
+          let ctx = fst (List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list ctx)) in
+          let ctx = Context.Rel.of_list ctx in
           let ctx =
             try instantiate_context env u paramsubst nas ctx
             with ArgumentsMismatch ->
@@ -915,7 +916,7 @@ let check_context env rels =
       | LocalAssum (x,ty) ->
         let jty = infer_type env ty in
         let () = check_assum_annot env jty.utj_type x jty.utj_val in
-        push_rel d env, LocalAssum (x,jty.utj_val) :: rels
+        push_rel d env, Context.Rel.add (LocalAssum (x,jty.utj_val)) rels
       | LocalDef (x,bd,ty) ->
         let j1 = infer env bd in
         let jty = infer_type env ty in
@@ -924,8 +925,8 @@ let check_context env rels =
         | Result.Error () -> error_actual_type env j1 ty
         in
         let () = check_let_annot env jty.utj_type x j1.uj_val jty.utj_val in
-        push_rel d env, LocalDef (x,j1.uj_val,jty.utj_val) :: rels)
-    rels ~init:(env,[])
+        push_rel d env, Context.Rel.add (LocalDef (x,j1.uj_val,jty.utj_val)) rels)
+    rels ~init:(env, Context.Rel.empty)
 
 let check_cast env cj k tj =
   check_cast env cj.uj_val cj.uj_type k tj.utj_val

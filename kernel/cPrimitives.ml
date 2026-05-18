@@ -399,7 +399,7 @@ let one_param =
   (* currently if there's a parameter it's always this *)
   let a_annot = Context.nameR (Names.Id.of_string "A") in
   let ty = Constr.mkType (Universe.make (Level.var 0)) in
-  Context.Rel.(add LocalAssum (a_annot, ty) empty)
+  Context.Rel.(add (Declaration.LocalAssum (a_annot, ty)) empty)
 
 let params = function
   | Int63head0
@@ -465,7 +465,7 @@ let params = function
   | Arraycopy
   | Arraylength -> one_param
 
-let nparams x = List.length (params x)
+let nparams x = Context.Rel.length (params x)
 
 let univs = function
   | Int63head0

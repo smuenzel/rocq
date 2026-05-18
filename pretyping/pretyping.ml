@@ -1333,7 +1333,7 @@ struct
     let fsign, record =
       match Environ.get_projections !!env ind with
       | None ->
-         List.map2 set_name (List.rev nal) cs.cs_args, false
+         Context.Rel.of_list (List.map2 set_name (List.rev nal) (Context.Rel.to_list cs.cs_args)), false
       | Some ps ->
         let rec aux n k names l =
           match names, l with
@@ -1346,7 +1346,7 @@ struct
             set_name na decl :: aux (n+1) k names l
           | [], [] -> []
           | _ -> assert false
-        in aux 1 1 (List.rev nal) cs.cs_args, true in
+        in Context.Rel.of_list (aux 1 1 (List.rev nal) (Context.Rel.to_list cs.cs_args)), true in
     let fsign = Context.Rel.map (whd_betaiota !!env sigma) fsign in
     let hypnaming = VarSet.variables (Global.env ()) in
     let fsign,env_f = push_rel_context ~hypnaming sigma fsign env in
@@ -1359,11 +1359,11 @@ struct
     in
     (* Make dependencies from arity signature impossible *)
     let arsgn, indr =
-      let arsgn = get_arity !!env indf in
+      let arsgn = Context.Rel.to_list (get_arity !!env indf) in
       List.map (set_name Anonymous) arsgn, Inductiveops.relevance_of_inductive_family !!env indf
     in
       let indt = build_dependent_inductive !!env indf in
-      let psign = LocalAssum (make_annot na indr, indt) :: arsgn in (* For locating names in [po] *)
+      let psign = Context.Rel.of_list (LocalAssum (make_annot na indr, indt) :: arsgn) in (* For locating names in [po] *)
       let predenv = Cases.make_return_predicate_ltac_lvar env sigma na c cj.uj_val in
       let nar = List.length arsgn in
       let psign',env_p = push_rel_context ~hypnaming ~force_names:true sigma psign predenv in
@@ -1423,7 +1423,7 @@ struct
         CErrors.user_err ?loc (str "If is only for inductive types with two constructors.")
     in
     let arsgn, indr =
-      let arsgn = get_arity !!env indf in
+      let arsgn = Context.Rel.to_list (get_arity !!env indf) in
       (* Make dependencies from arity signature impossible *)
       List.map (set_name Anonymous) arsgn, Inductiveops.relevance_of_inductive_family !!env indf
     in
@@ -1432,7 +1432,7 @@ struct
     let psign = LocalAssum (make_annot na indr, indt) :: arsgn in (* For locating names in [po] *)
     let predenv = Cases.make_return_predicate_ltac_lvar env sigma na c cj.uj_val in
     let hypnaming = VarSet.variables (Global.env ()) in
-    let psign,env_p = push_rel_context ~hypnaming sigma psign predenv in
+    let psign,env_p = push_rel_context ~hypnaming sigma (Context.Rel.of_list psign) predenv in
     let sigma, pred, p = match po with
       | Some p ->
         let sigma, pj = eval_type_pretyper self ~flags empty_valcon env_p sigma p in
@@ -1455,7 +1455,7 @@ struct
       let cs_args = cs.cs_args in
       let cs_args = Context.Rel.map (whd_betaiota !!env sigma) cs_args in
       let csgn =
-        List.map (set_name Anonymous) cs_args
+        Context.Rel.of_list (List.map (set_name Anonymous) (Context.Rel.to_list cs_args))
       in
       let _,env_c = push_rel_context ~hypnaming sigma csgn env in
       let sigma, bj = pretype (mk_tycon pi) env_c sigma b in

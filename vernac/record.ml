@@ -99,7 +99,7 @@ let interp_fields_evars ~primitive_proj ~poly env sigma ~ninds ~nparams record_s
           f sigma
       in
       EConstr.push_rel f env, k+1, sigma)
-      newfs
+      (Context.Rel.of_list newfs)
   in
   sigma, (impls, locs, newfs)
 
@@ -279,7 +279,7 @@ let finalize_def_class ~poly env sigma ~params ~sort ~projtyp =
   let () = Context.Rel.iter ce params in
   let () = ce projtyp in
   let () =
-    if not (Vars.closedn (List.length params) projtyp) then
+    if not (Vars.closedn (Context.Rel.length params) projtyp) then
       CErrors.user_err Pp.(str "Definitional classes cannot be recursive.")
   in
   sigma, params, sort, typ, projtyp
@@ -321,7 +321,7 @@ let bound_names_ind_entry (ind:Entries.one_inductive_entry) : Id.Set.t =
   in
   let fields, _ = Term.decompose_prod_decls ctor in
   let add_names names field = add_bound_names_constr names (RelDecl.get_type field) in
-  List.fold_left add_names Id.Set.empty fields
+  List.fold_left add_names Id.Set.empty (Context.Rel.to_list fields)
 
 let inhabitant_id ~isclass bound_names ind {DataI.default_inhabitant_id=id; name} =
   match id with
@@ -369,13 +369,13 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
     Constrintern.compute_internalization_env env0 sigma ~impls:impls_env Constrintern.Inductive ids arities impls
   in
   let ninds = List.length arities in
-  let nparams = List.length params in
+  let nparams = Context.Rel.length params in
   let fold sigma { DataI.nots; fs; _ } record_sort =
     interp_fields_evars ~primitive_proj ~poly:flags.poly env_ar_params sigma ~ninds ~nparams record_sort impls_env nots fs
   in
   let (sigma, fields) = List.fold_left2_map fold sigma records aritysorts in
   let field_impls, locs, fields = List.split3 fields in
-  let field_impls = List.map (List.map (adjust_field_implicits ~isclass (params,impls))) field_impls in
+  let field_impls = List.map (List.map (adjust_field_implicits ~isclass (Context.Rel.to_list params,impls))) field_impls in
   let sigma =
     Pretyping.solve_remaining_evars Pretyping.all_and_fail_flags env_ar_params sigma in
   if def then
@@ -417,13 +417,13 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
   else
     (* each inductive has one constructor *)
     let ninds = List.length arities in
-    let nparams = List.length params in
+    let nparams = Context.Rel.length params in
     let constructors = List.map2_i (fun i record fields ->
         let open EConstr in
         let nfields = List.length fields in
         let ind_args = Context.Rel.instance_list mkRel nfields params in
         let ind = applist (mkRel (ninds - i + nparams + nfields), ind_args) in
-        let ctor = it_mkProd_or_LetIn ind fields in
+        let ctor = it_mkProd_or_LetIn ind (Context.Rel.of_list fields) in
         [record.DataI.constructor_name], [ctor])
         0 records fields
     in
@@ -722,13 +722,13 @@ let declare_projections indsp ~kind ~inhabitant_id flags ?fieldlocs fieldimpls =
   let elim_cstrs_map = Cmap_env.empty in
   let record_quality = Sorts.quality mip.mind_sort in
   let fields, _ = mip.mind_nf_lc.(0) in
-  let fields = List.firstn mip.mind_consnrealdecls.(0) fields in
+  let fields = Context.Rel.firstn mip.mind_consnrealdecls.(0) fields in
   let paramdecls = Inductive.inductive_paramdecls (mib, uinstance) in
   let r = mkIndU (indsp,uinstance) in
   let rp = applist (r, Context.Rel.instance_list mkRel 0 paramdecls) in
   let paramargs = Context.Rel.instance_list mkRel 1 paramdecls in (*def in [[params;x:rp]]*)
   let x = make_annot (Name inhabitant_id) (Inductive.relevance_of_ind_body mip uinstance) in
-  let fields = instantiate_possibly_recursive_type (fst indsp) uinstance (Declareops.mind_ntypes mib) paramdecls fields in
+  let fields = instantiate_possibly_recursive_type (fst indsp) uinstance (Declareops.mind_ntypes mib) (Context.Rel.to_list paramdecls) fields in
   let lifted_fields = Vars.lift_rel_context 1 fields in
   let primitive =
     match mip.mind_record with
@@ -736,13 +736,13 @@ let declare_projections indsp ~kind ~inhabitant_id flags ?fieldlocs fieldimpls =
     | FakeRecord | NotRecord -> false
   in
   let fieldlocs = match fieldlocs with
-    | None -> List.make (List.length fields) None
+    | None -> List.make (Context.Rel.length fields) None
     | Some fieldlocs -> fieldlocs
   in
   let (_, _, _, canonical_projections, _) =
     List.fold_left4
       (build_proj env mib indsp primitive x rp lifted_fields paramdecls paramargs record_quality ~uinstance ~kind ~univs)
-      (elim_cstrs_map, List.length fields,0,[],[]) flags (List.rev fieldlocs) (List.rev fields) (List.rev fieldimpls)
+      (elim_cstrs_map, Context.Rel.length fields,0,[],[]) flags (List.rev fieldlocs) (Context.Rel.to_list (Context.Rel.rev fields)) (List.rev fieldimpls)
   in
     List.rev canonical_projections
 
@@ -1041,7 +1041,7 @@ let declare_class ?mode declared =
       let mib, mip = Inductive.lookup_mind_specif env (mind,0) in
       let univs = Declareops.inductive_polymorphic_context mib in
       let ctor_args, _ = mip.mind_nf_lc.(0) in
-      let fields = List.firstn mip.mind_consnrealdecls.(0) ctor_args in
+      let fields = Context.Rel.to_list (Context.Rel.firstn mip.mind_consnrealdecls.(0) ctor_args) in
       let make_proj decl kn = {
         Typeclasses.meth_name = RelDecl.get_name decl;
         meth_const = kn;
@@ -1057,7 +1057,7 @@ let declare_class ?mode declared =
     cl_unique = typeclasses_unique ();
     cl_context = params;
     cl_trivial = CList.is_empty fields;
-    cl_props = fields;
+    cl_props = Context.Rel.of_list fields;
     cl_projs = projs;
   }
   in
@@ -1076,7 +1076,7 @@ let add_constant_class cst =
       cl_impl = GlobRef.ConstRef cst;
       cl_context = ctx;
       cl_trivial = false;
-      cl_props = [LocalAssum (make_annot Anonymous r, t)];
+      cl_props = Context.Rel.of_list [LocalAssum (make_annot Anonymous r, t)];
       cl_projs = [];
       cl_strict = typeclasses_strict ();
       cl_unique = typeclasses_unique ()
@@ -1097,10 +1097,10 @@ let add_inductive_class ind =
       let r = oneind.mind_relevance in
       let args = Context.Rel.instance mkRel 0 ctx in
       let ty = mkApp (mkIndU (ind, UVars.make_abstract_instance univs), args) in
-      [LocalAssum (make_annot Anonymous r, ty)], []
+      Context.Rel.of_list [LocalAssum (make_annot Anonymous r, ty)], []
     | s ->
       let props, _ = oneind.mind_nf_lc.(0) in
-      let props = List.firstn oneind.mind_consnrealdecls.(0) props in
+      let props = Context.Rel.firstn oneind.mind_consnrealdecls.(0) props in
       let projs = s.projections |> List.map (fun (p:Structure.projection) ->
           { meth_name = p.proj_name; meth_const = p.proj_body })
       in

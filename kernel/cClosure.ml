@@ -505,7 +505,7 @@ let subst_context e ctx =
     let bdy = subst_constr e bdy in
     usubs_lift e, LocalDef (na, ty, bdy) :: ctx
   in
-  snd @@ subst_context ctx
+  Context.Rel.of_list (snd @@ subst_context (Context.Rel.to_list ctx))
 
 (** The inverse of mk_clos: move back to constr
     Assuming [Γ ⊢ lfts : Δ] and [Δ ⊢ v],
@@ -656,12 +656,13 @@ let subst_context env ctx =
 let it_mkLambda_or_LetIn infos ctx t =
   let l = Range.length (info_relevances infos) in
   let open Context.Rel.Declaration in
-  match List.rev ctx with
+  let rctx = Context.Rel.to_list (Context.Rel.rev ctx) in
+  match rctx with
   | [] -> t
-  | LocalAssum (n, ty) :: ctx ->
-      let assums, ctx = List.map_until (function LocalAssum (n, ty) -> Some (n, ty) | LocalDef _ -> None) ctx in
+  | LocalAssum (n, ty) :: rctx ->
+      let assums, rctx = List.map_until (function LocalAssum (n, ty) -> Some (n, ty) | LocalDef _ -> None) rctx in
       let assums = (n, ty) :: assums in
-      { term = FLambda(List.length assums, assums, Term.it_mkLambda_or_LetIn (term_of_fconstr t) (List.rev ctx), (subs_id l, UVars.Instance.empty)); mark = t.mark }
+      { term = FLambda(List.length assums, assums, Term.it_mkLambda_or_LetIn (term_of_fconstr t) (Context.Rel.of_list (List.rev rctx)), (subs_id l, UVars.Instance.empty)); mark = t.mark }
   | LocalDef _ :: _ ->
       mk_clos (subs_id l, UVars.Instance.empty) (Term.it_mkLambda_or_LetIn (term_of_fconstr t) ctx)
 
@@ -895,7 +896,7 @@ let inductive_subst mib u pms =
     let subs = mk_pms i ctx in
     subs_cons (mk_clos (subs,u) c) subs
   in
-  mk_pms (Array.length pms - 1) mib.mind_params_ctxt, u
+  mk_pms (Array.length pms - 1) (Context.Rel.to_list mib.mind_params_ctxt), u
 
 let args_subst ind_subst ctx args e =
   let rec aux args_subst ind_subst i = function
@@ -928,7 +929,7 @@ let get_branch infos ci pms ((ind, c), u) args br e =
     let mib = Environ.lookup_mind (fst ind) env in
     let mip = mib.mind_packets.(snd ind) in
     let (ctx, _) = mip.mind_nf_lc.(i) in
-    let ctx, _ = List.chop mip.mind_consnrealdecls.(i) ctx in
+    let ctx, _ = List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list ctx) in
     let ind_subst = inductive_subst mib u (Array.map (mk_clos e) pms) in
     let e = args_subst ind_subst ctx args e in
     (br, e)
@@ -1670,8 +1671,8 @@ and match_elim : 'a. ('a, 'a depth) reduction -> _ -> _ -> pat_state:'a depth ->
       let ntys_ret = subst_context e ntys_ret in
       let ret = mk_clos (usubs_liftn (Context.Rel.length ntys_ret) e) (snd p) in
       let brs = Array.map2 (fun ctx br -> subst_context e ctx, mk_clos (usubs_liftn (Context.Rel.length ctx) e) (snd br)) ntys_brs brs in
-      let loc = Array.fold_right2 (fun patterns (ctx, arg) next -> LocArg { patterns; context = ctx @ context; arg; next }) (Array.transpose (Array.map (Status.split_array (Array.length brs)) pbrss)) brs loc in
-      let loc = LocArg { patterns = prets; context = ntys_ret @ context; arg = ret; next = loc } in
+      let loc = Array.fold_right2 (fun patterns (ctx, arg) next -> LocArg { patterns; context = Context.Rel.append ctx context; arg; next }) (Array.transpose (Array.map (Status.split_array (Array.length brs)) pbrss)) brs loc in
+      let loc = LocArg { patterns = prets; context = Context.Rel.append ntys_ret context; arg = ret; next = loc } in
       match_main red info tab ~pat_state states loc
   | Zproj (proj', r) :: s ->
       let mark = (neutr head.mark) in
@@ -1808,13 +1809,13 @@ and match_head red info tab ~pat_state next context states patterns t stk =
     in
 
     let ntys, body = Term.decompose_prod_n (na-1) body in
-    let ctx1 = List.map (fun (n, ty) -> Context.Rel.Declaration.LocalAssum (n, ty)) ntys |> subst_context e in
-    let ctx = ctx1 @ [Context.Rel.Declaration.LocalAssum (n, term_of_fconstr ty)] in
+    let ctx1 = subst_context e (Context.Rel.of_list (List.map (fun (n, ty) -> Context.Rel.Declaration.LocalAssum (n, ty)) ntys)) in
+    let ctx = Context.Rel.append ctx1 (Context.Rel.add (Context.Rel.Declaration.LocalAssum (n, term_of_fconstr ty)) Context.Rel.empty) in
     let ntys'' = List.mapi (fun n (_, t) -> mk_clos (usubs_liftn n e) t) (List.rev ntys) in
     let tys = Array.of_list (ty :: ntys'') in
-    let contexts_upto = Array.init na (fun i -> List.lastn i ctx @ context) in
+    let contexts_upto = Array.init na (fun i -> Context.Rel.append (Context.Rel.skipn (Context.Rel.length ctx - i) ctx) context) in
     let loc = LocStart { elims; context; head=t; stack=stk; next=Continue next } in
-    let loc = LocArg { patterns = pbody; context = ctx @ context; arg = mk_clos (usubs_liftn na e) body; next = loc } in
+    let loc = LocArg { patterns = pbody; context = Context.Rel.append ctx context; arg = mk_clos (usubs_liftn na e) body; next = loc } in
     let loc = Array.fold_right3 (fun patterns arg context next -> LocArg { patterns; context; arg; next }) (Array.transpose (Array.map (Status.split_array na) ptys)) tys contexts_upto loc in
     match_main red info tab ~pat_state states loc
   | FLambda (na, ntys, body, e) ->
@@ -1830,12 +1831,12 @@ and match_head red info tab ~pat_state next context states patterns t stk =
     in
     let ntys, tys' = List.chop na ntys in
     let body = Term.compose_lam (List.rev tys') body in
-    let ctx = List.rev_map (fun (n, ty) -> Context.Rel.Declaration.LocalAssum (n, ty)) ntys |> subst_context e in
+    let ctx = subst_context e (Context.Rel.of_list (List.rev_map (fun (n, ty) -> Context.Rel.Declaration.LocalAssum (n, ty)) ntys)) in
     let tys = Array.of_list ntys in
     let tys = Array.mapi (fun n (_, t) -> mk_clos (usubs_liftn n e) t) tys in
-    let contexts_upto = Array.init na (fun i -> List.lastn i ctx @ context) in
+    let contexts_upto = Array.init na (fun i -> Context.Rel.append (Context.Rel.skipn (Context.Rel.length ctx - i) ctx) context) in
     let loc = LocStart { elims; context; head=t; stack=stk; next=Continue next } in
-    let loc = LocArg { patterns = pbody; context = ctx @ context; arg = mk_clos (usubs_liftn na e) body; next = loc } in
+    let loc = LocArg { patterns = pbody; context = Context.Rel.append ctx context; arg = mk_clos (usubs_liftn na e) body; next = loc } in
     let loc = Array.fold_right3 (fun patterns arg context next -> LocArg { patterns; context; arg; next }) (Array.transpose (Array.map (Status.split_array na) ptys)) tys contexts_upto loc in
     match_main red info tab ~pat_state states loc
   | _ ->
@@ -1856,7 +1857,7 @@ let match_symbol red info tab ~pat_state fl (u, b, r) stk =
     ) (Array.of_list r)
   in
   let m = { mark = Red; term = FFlex fl } in
-  let loc = LocStart { elims; context=[]; head = m; stack = stk; next = Return (unfold_fix, m, stk) } in
+  let loc = LocStart { elims; context = Context.Rel.empty; head = m; stack = stk; next = Return (unfold_fix, m, stk) } in
   match_main red info tab ~pat_state states loc
 
 let match_head red info tab ~pat_state { states; context; patterns; next } m stk =

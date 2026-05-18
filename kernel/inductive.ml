@@ -305,11 +305,11 @@ let instantiate_template_universes mib args =
   | None -> assert false
   | Some t -> t
   in
-  let ctx = List.rev mib.mind_params_ctxt in
+  let ctx = Context.Rel.to_list (Context.Rel.rev mib.mind_params_ctxt) in
   let subst = make_subst templ.template_defaults (ctx,templ.template_param_arguments,args) in
   let ctx = template_subst_ctx subst ctx templ.template_param_arguments in
   let cstrs = instantiate_template_constraints subst templ in
-  (cstrs, ctx, subst)
+  (cstrs, Context.Rel.of_list ctx, subst)
 
 (* Type of an inductive type *)
 
@@ -334,7 +334,7 @@ let type_of_inductive_gen ((mib,mip),u) paramtyps =
     subst_instance_constr u mip.mind_user_arity, cst
   | Some templ ->
     let cst, params, subst = instantiate_template_universes mib paramtyps in
-    let ctx = (List.firstn mip.mind_nrealdecls mip.mind_arity_ctxt) @ params in
+    let ctx = Context.Rel.append (Context.Rel.firstn mip.mind_nrealdecls mip.mind_arity_ctxt) params in
     let s = template_subst_sort subst templ.template_concl in
     Term.mkArity (ctx, s), cst
 
@@ -362,7 +362,7 @@ let type_of_constructor_gen (cstr, u) (mib,mip) paramtyps =
     subst_instance_constr u mip.mind_user_lc.(i-1), cst
   | Some _ ->
     let cst, params, _ = instantiate_template_universes mib paramtyps in
-    let _, typ = Term.decompose_prod_n_decls (List.length mib.mind_params_ctxt) mip.mind_user_lc.(i - 1) in
+    let _, typ = Term.decompose_prod_n_decls (Context.Rel.length mib.mind_params_ctxt) mip.mind_user_lc.(i - 1) in
     let typ = Term.it_mkProd_or_LetIn typ params in
     typ, cst
 
@@ -511,8 +511,8 @@ let expand_case_specif mib (ci, u, params, (p,rp), iv, c, br) =
   (* Expand the branches *)
   let ebr =
     let build_one_branch i (nas, br) (ctx, _) =
-      let ctx, _ = List.chop mip.mind_consnrealdecls.(i) ctx in
-      let ctx = instantiate_context u paramsubst nas ctx in
+      let ctx, _ = List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list ctx) in
+      let ctx = instantiate_context u paramsubst nas (Context.Rel.of_list ctx) in
       Term.it_mkLambda_or_LetIn br ctx
     in
     Array.map2_i build_one_branch br mip.mind_nf_lc
@@ -529,7 +529,7 @@ let contract_case env (ci, (p,rp), iv, c, br) =
     | Some v -> v
     | None -> CErrors.anomaly Pp.(str "contract_case: not enough abstractions in return predicate.")
   in
-  let (u, pms) = match arity with
+  let (u, pms) = match Context.Rel.to_list arity with
   | LocalAssum (_, ty) :: _ ->
     (** Last binder is the self binder for the term being eliminated *)
     let (ind, args) = decompose_app ty in
@@ -543,7 +543,7 @@ let contract_case env (ci, (p,rp), iv, c, br) =
   | _ -> assert false
   in
   let p =
-    let nas = Array.of_list (List.rev_map get_annot arity) in
+    let nas = Array.of_list (List.rev_map get_annot (Context.Rel.to_list arity)) in
     ((nas, p),rp)
   in
   let map i br =
@@ -552,7 +552,7 @@ let contract_case env (ci, (p,rp), iv, c, br) =
       | None ->
         CErrors.anomaly Pp.(fmt "contract_case: not enough abstractions in branch %d." i)
     in
-    let nas = Array.of_list (List.rev_map get_annot ctx) in
+    let nas = Array.of_list (List.rev_map get_annot (Context.Rel.to_list ctx)) in
     (nas, br)
   in
   (ci, u, pms, p, iv, c, Array.mapi map br)
@@ -1188,7 +1188,7 @@ let restrict_spec ?evars env spec p =
   let i,args = decompose_app_list (whd_all ?evars env s) in
   match kind i with
   | Ind i ->
-    if has_constant_parameters env absctxlen (List.length arctx) i args then spec
+    if has_constant_parameters env absctxlen (Context.Rel.length arctx) i args then spec
     else
       Subterm.prune_path ?evars env spec i args
   | _ -> Subterm.not_subterm
@@ -1217,7 +1217,7 @@ let filter_stack_domain stack_element_specif not_subterm ?evars env p stack =
         let elt = match kind ty with
         | Ind ind ->
           let spec = stack_element_specif ?evars elt in
-          if has_constant_parameters env absctxlen (k + List.length ctx) ind args then
+          if has_constant_parameters env absctxlen (k + Context.Rel.length ctx) ind args then
             spec
           else
             lazy (Subterm.prune_path ?evars env (Lazy.force spec) ind args)

@@ -1402,7 +1402,7 @@ let reduce_to_ind_gen allow_product env sigma t =
           let open Context.Rel.Declaration in
           if allow_product then
             let ty = nf_betaiota env sigma ty in
-            elimrec (push_rel (LocalAssum (n,ty)) env) t' ((LocalAssum (n,ty))::l)
+            elimrec (push_rel (LocalAssum (n,ty)) env) t' (Context.Rel.add (LocalAssum (n,ty)) l)
           else
             None, it_mkProd_or_LetIn t l
       | _ ->
@@ -1414,7 +1414,7 @@ let reduce_to_ind_gen allow_product env sigma t =
             | _ -> None, it_mkProd_or_LetIn t l
 
   in
-  elimrec env t []
+  elimrec env t Context.Rel.empty
 
 let reduce_to_quantified_ind env sigma c =
   match reduce_to_ind_gen true env sigma c with
@@ -1509,7 +1509,7 @@ let reduce_to_ref_gen allow_failure allow_product env sigma ref t =
       | Prod (n,ty,t') ->
         if allow_product then
           let open Context.Rel.Declaration in
-          elimrec (push_rel (LocalAssum (n,ty)) env) t' ((LocalAssum (n,ty))::l)
+          elimrec (push_rel (LocalAssum (n,ty)) env) t' (Context.Rel.add (LocalAssum (n,ty)) l)
         else if allow_failure then
           it_mkProd_or_LetIn t l
         else
@@ -1527,7 +1527,7 @@ let reduce_to_ref_gen allow_failure allow_product env sigma ref t =
             else
               error_cannot_recognize ref
     in
-    elimrec env t []
+    elimrec env t Context.Rel.empty
 
 let reduce_to_quantified_ref ?(allow_failure=false) = reduce_to_ref_gen allow_failure true
 let reduce_to_atomic_ref ?(allow_failure=false) = reduce_to_ref_gen allow_failure false

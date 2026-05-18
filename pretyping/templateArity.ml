@@ -32,17 +32,18 @@ let get_template_arity env ind ~ctoropt =
   in
   let type_after_params = match ctoropt with
     | None ->
-      let ctx = List.rev @@ List.skipn (List.length mib.mind_params_ctxt) @@
-        List.rev mip.mind_arity_ctxt
+      let ctx = Context.Rel.rev (Context.Rel.skipn (Context.Rel.length mib.mind_params_ctxt) (Context.Rel.rev mip.mind_arity_ctxt))
       in
       IndType (template, EConstr.of_rel_context ctx, template.template_concl)
     | Some ctor ->
       let ctyp = mip.mind_user_lc.(ctor-1) in
-      let _, ctyp = Term.decompose_prod_n_decls (List.length mib.mind_params_ctxt) ctyp in
+      let _, ctyp = Term.decompose_prod_n_decls (Context.Rel.length mib.mind_params_ctxt) ctyp in
       (* don't bother with Prop for constructors *)
       CtorType (template, EConstr.of_constr ctyp)
   in
-  let rec aux is_template (params:Constr.rel_context) = match is_template, params with
+  let rec aux is_template params =
+    let open Context.Rel.Declaration in
+    match is_template, params with
     | _, LocalDef (na,v,t) :: params ->
       let codom = aux is_template params in
       DefParam (EConstr.of_binder_annot na, EConstr.of_constr v, EConstr.of_constr t, codom)
@@ -58,5 +59,5 @@ let get_template_arity env ind ~ctoropt =
       let binder = { bind_sort; default } in
       TemplateArg (EConstr.of_binder_annot na, EConstr.of_rel_context ctx, binder, codom)
   in
-  let res = aux template.template_param_arguments (List.rev mib.mind_params_ctxt) in
+  let res = aux template.template_param_arguments (Context.Rel.to_list (Context.Rel.rev mib.mind_params_ctxt)) in
   res

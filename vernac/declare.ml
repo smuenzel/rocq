@@ -1314,7 +1314,7 @@ let shrink_body c ty =
           , Option.map (Term.mkProd_or_LetIn decl) ty
           , succ i
           , args ))
-      (b, ty, 1, []) ctx
+      (b, ty, 1, []) (Context.Rel.to_list ctx)
   in
   (ctx, b', ty', Array.of_list args)
 
@@ -1353,7 +1353,7 @@ let declare_obligation prg obl ~uctx ~types ~body =
     let poly = prg.prg_info.Info.poly in
     let ctx, body, ty, args =
       if not (PolyFlags.univ_poly poly) then shrink_body body types
-      else ([], body, types, [||])
+      else (Context.Rel.empty, body, types, [||])
     in
     let uctx' = UState.restrict uctx (universes_of_decl body types) in
     let univs = UState.univ_entry ~poly uctx' in

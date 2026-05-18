@@ -116,7 +116,7 @@ let is_ground_env evd env =
   let is_ground_named_decl = function
     | NamedDecl.LocalDef (_,b,_) -> is_ground_term evd (EConstr.of_constr b)
     | _ -> true in
-  List.for_all is_ground_rel_decl (rel_context env) &&
+  List.for_all is_ground_rel_decl (Context.Rel.to_list (rel_context env)) &&
   List.for_all is_ground_named_decl (named_context env)
 
 (* Expand head evar if any (currently consider only applications but I
@@ -372,7 +372,7 @@ let push_rel_context_to_named_context ~hypnaming env sigma typ =
   (* compute the instances relative to the named context and rel_context *)
   let open EConstr in
   let ctx = named_context_val env in
-  if List.is_empty (Environ.rel_context env) then
+  if Context.Rel.length (Environ.rel_context env) = 0 then
     let inst = SList.defaultn (List.length @@ named_context_of_val ctx) SList.empty in
     (ctx, typ, inst, empty_csubst)
   else

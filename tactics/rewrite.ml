@@ -196,7 +196,7 @@ let decompose_applied_relation env sigma (c,l) =
     | Some c -> c
     | None ->
       let ctx,t' = Reductionops.whd_decompose_prod env sigma ctype in (* Search for underlying eq *)
-      let t' = it_mkProd_or_LetIn t' (List.map (fun (n,t) -> LocalAssum (n, t)) ctx) in
+      let t' = it_mkProd_or_LetIn t' (Context.Rel.of_list (List.map (fun (n,t) -> LocalAssum (n, t)) ctx)) in
       match find_rel t' with
       | Some c -> c
       | None -> user_err Pp.(str "Cannot find a homogeneous relation to rewrite.")
@@ -964,7 +964,7 @@ let fold_match ?(force=false) env sigma c =
     let sortc = Retyping.get_sort_quality_of env sigma cty in
     let dep = not (noccurn sigma 1 body) in
     let pred = if dep then p else
-        it_mkProd_or_LetIn (subst1 mkProp body) (List.tl ctx)
+        it_mkProd_or_LetIn (subst1 mkProp body) (Context.Rel.of_list (List.tl (Context.Rel.to_list ctx)))
     in
     let sk =
       (* not sure how correct this is *)
@@ -1796,7 +1796,7 @@ let proper_projection env sigma r ty =
   let rel_vect n m = Array.init m (fun i -> mkRel(n+m-i)) in
   let ctx, inst = decompose_prod_decls sigma ty in
   let mor, args = destApp sigma inst in
-  let instarg = mkApp (r, rel_vect 0 (List.length ctx)) in
+  let instarg = mkApp (r, rel_vect 0 (Context.Rel.length ctx)) in
   let sigma, proj = Evd.fresh_global env sigma (PropGlobal.proper_proj ()) in
   let app = mkApp (proj,
                   Array.append args [| instarg |]) in

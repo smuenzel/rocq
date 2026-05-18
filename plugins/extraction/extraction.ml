@@ -105,7 +105,7 @@ let push_rel_assum (n, t) env =
   EConstr.push_rel (LocalAssum (n, t)) env
 
 let push_rels_assum assums =
-  EConstr.push_rel_context (List.map (fun (x,t) -> LocalAssum (x,t)) assums)
+  EConstr.push_rel_context (Context.Rel.of_list (List.map (fun (x,t) -> LocalAssum (x,t)) assums))
 
 let qmono uctx inst lconstr = match uctx with
 | Monomorphic -> EConstr.of_constr lconstr
@@ -272,7 +272,7 @@ let fake_match_projection env p =
     let (ctx, cty) = mip.mind_nf_lc.(0) in
     let cty = Term.it_mkProd_or_LetIn cty ctx in
     let rctx, _ = decompose_prod_decls (Vars.substl subst cty) in
-    List.chop mip.mind_consnrealdecls.(0) rctx
+    List.chop mip.mind_consnrealdecls.(0) (Context.Rel.to_list rctx)
   in
   let ci_pp_info = { style = LetStyle } in
   let ci = {
@@ -289,7 +289,7 @@ let fake_match_projection env p =
     | PrimRecord { id; _ } ->
       make_annot (Name id) mip.mind_relevance
   in
-  let indty = mkApp (indu, Context.Rel.instance mkRel 0 paramslet) in
+  let indty = mkApp (indu, Context.Rel.instance mkRel 0 (Context.Rel.of_list paramslet)) in
   let rec fold arg j subst = function
     | [] -> assert false
     | LocalAssum (na,ty) :: rem ->
@@ -304,7 +304,7 @@ let fake_match_projection env p =
           let nas = Array.of_list (List.rev_map Context.Rel.Declaration.get_annot ctx) in
           (nas, mkRel (List.length ctx - (j - 1)))
         in
-        let params = Context.Rel.instance mkRel 1 paramslet in
+        let params = Context.Rel.instance mkRel 1 (Context.Rel.of_list paramslet) in
         let body = mkCase (ci, u, params, (p,relevance), NoInvert, mkRel 1, [|branch|]) in
         it_mkLambda_or_LetIn (mkLambda (x,indty,body)) mib.mind_params_ctxt
     | LocalDef (_,c,t) :: rem ->
@@ -493,7 +493,7 @@ and extract_really_ind table env kn inst mib =
     (* Everything concerning parameters. *)
     (* We do that first, since they are common to all the [mib]. *)
     let mip0 = mib.mind_packets.(0) in
-    let ndecls = List.length mib.mind_params_ctxt in
+    let ndecls = Context.Rel.length mib.mind_params_ctxt in
     let npar = mib.mind_nparams in
     let epar = push_rel_context (Vars.subst_instance_context u mib.mind_params_ctxt) env in
     let sg = Evd.from_env env in
@@ -532,7 +532,7 @@ and extract_really_ind table env kn inst mib =
         for j = 0 to Array.length types - 1 do
           let t = snd (decompose_prod_n_decls ndecls types.(j)) in
           let prods,head = Reduction.whd_decompose_prod epar t in
-          let nprods = List.length prods in
+          let nprods = Context.Rel.length prods in
           let args = match Constr.kind head with
             | App (f,args) -> args (* [Constr.kind f = Ind ip] *)
             | _ -> [||]

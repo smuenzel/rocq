@@ -71,6 +71,7 @@ struct
     fun s sigma -> return (RelDecl.map_constr (fun t -> snd @@ weaken t s sigma) decl) s sigma
 
   let weaken_context cxt s sigma =
+    let cxt = Context.Rel.to_list cxt in
     let nb_cxt = List.length cxt in
     let wcxt = List.mapi (fun i x ->
       let n = nb_cxt - i -1 in
@@ -80,7 +81,7 @@ struct
       | LocalDef (na, bd, ty) -> LocalDef (na, weak bd, weak ty)
       ) cxt
     in
-    return wcxt s sigma
+    return (Context.Rel.of_list wcxt) s sigma
 
 (** {6 Access Key } *)
 
@@ -88,11 +89,11 @@ struct
 
   let fresh_key s =
     let (_, ctx) = get_context s Evar_empty in
-    List.length ctx
+    Context.Rel.length ctx
 
   let make_key i =
     let* ctx = get_context in
-    return @@ List.length ctx - i
+    return @@ Context.Rel.length ctx - i
 
 (** {6 Push Functions } *)
 
@@ -123,15 +124,16 @@ struct
 
   let get_decl key =
     let* ctx = get_context in
-    let n' = List.length ctx - key -1 in
-    let decl = RelDecl.map_constr (Vars.lift n') (List.nth ctx n') in
+    let n' = Context.Rel.length ctx - key -1 in
+    let ctx_list = Context.Rel.to_list ctx in
+    let decl = RelDecl.map_constr (Vars.lift n') (List.nth ctx_list n') in
     return decl
 
   let getters f =
     let get_X key =
       let* decl = get_decl key in
       let* cxt = get_context in
-      return (f (List.length cxt - key -1) decl) in
+      return (f (Context.Rel.length cxt - key -1) decl) in
 
     let geti_X keys pos_key = get_X (List.nth keys pos_key) in
 
@@ -417,11 +419,11 @@ let read_context_sep binder cxt =
 let read_context_sep_forget binder cxt cc =
   read_context_sep binder cxt (fun (x,_,_) -> cc x)
 
-let add_context fresh naming_scheme = read_context_sep_forget (add_decl fresh naming_scheme)
-let add_context_sep fresh naming_scheme = read_context_sep (add_decl fresh naming_scheme)
+let add_context fresh naming_scheme ctx cc = read_context_sep_forget (add_decl fresh naming_scheme) (Context.Rel.to_list ctx) cc
+let add_context_sep fresh naming_scheme ctx cc = read_context_sep (add_decl fresh naming_scheme) (Context.Rel.to_list ctx) cc
 
-let closure_context m binder fresh naming_scheme = read_context_sep_forget (build_binder m binder fresh naming_scheme)
-let closure_context_sep m binder fresh naming_scheme = read_context_sep (build_binder m binder fresh naming_scheme)
+let closure_context m binder fresh naming_scheme ctx cc = read_context_sep_forget (build_binder m binder fresh naming_scheme) (Context.Rel.to_list ctx) cc
+let closure_context_sep m binder fresh naming_scheme ctx cc = read_context_sep (build_binder m binder fresh naming_scheme) (Context.Rel.to_list ctx) cc
 
 let rebind m binder freshness naming_scheme ty cc =
   (* decompose type, and rebind local variable *)
@@ -440,22 +442,23 @@ let rebind m binder freshness naming_scheme ty cc =
   cc (key_locs, key_hd)
 
 (* takes a continuation after binder var and letin to add fresh binders and decide what to do with the keys *)
-let read_by_decl cxt binder cc_letin cc_var =
-  fold_left_state List.append cxt (fun pos_decl decl cc ->
+let read_by_decl cxt binder cc_letin cc_var cc =
+  fold_left_state List.append (Context.Rel.to_list cxt) (fun pos_decl decl cc ->
     let@ key = binder decl in
     match decl with
     | LocalDef _   -> cc_letin pos_decl key cc
     | LocalAssum _ -> cc_var   pos_decl key cc
-  )
+  ) cc
 
 (* ************************************************************************** *)
 (*                           Functions on Inductive                           *)
 (* ************************************************************************** *)
 
 let get_args mib u (cxt, ty) =
-  let nb_params_letin = List.length mib.mind_params_ctxt in
-  let (_, args) = List.chop nb_params_letin (List.rev cxt) in
-  let args = Vars.subst_instance_context u @@ EConstr.of_rel_context @@ List.rev args in
+  let nb_params_letin = Context.Rel.length mib.mind_params_ctxt in
+  let cxt_list = Context.Rel.to_list cxt in
+  let (_, args) = List.chop nb_params_letin (List.rev cxt_list) in
+  let args = Vars.subst_instance_context u @@ EConstr.of_rel_context (Context.Rel.of_list (List.rev args)) in
   let* (hd, xs) = decompose_app (Vars.subst_instance_constr u @@ EConstr.of_constr ty) in
   let indices = Array.sub xs mib.mind_nparams (Array.length xs - mib.mind_nparams) in
   return (args, indices)
@@ -482,13 +485,13 @@ let make_fix ind_bodies focus fix_rarg fix_name fix_type tmc =
   let* fix_types = list_mapi fix_type ind_bodies in
   (* update context continuation *)
   let fix_context = List.rev @@ List.map2_i (fun i na ty -> LocalAssum (na, Vars.lift i ty)) 0 fix_names fix_types in
-  let@ key_Fix = add_context Fresh naming_id fix_context in
+  let@ key_Fix = add_context Fresh naming_id (Context.Rel.of_list fix_context) in
   let* fix_bodies = list_mapi (fun pos_list ind -> tmc (key_Fix, pos_list, ind)) ind_bodies in
   (* result *)
   return @@ EConstr.mkFix ((Array.of_list rargs, focus), (Array.of_list fix_names, Array.of_list fix_types, Array.of_list fix_bodies))
 
 let get_indices indb u =
-  let indices, _ = List.chop indb.mind_nrealdecls indb.mind_arity_ctxt in
+  let indices = Context.Rel.firstn indb.mind_nrealdecls indb.mind_arity_ctxt in
   weaken_context (Vars.subst_instance_context u (EConstr.of_rel_context indices))
 
 (* make match *)

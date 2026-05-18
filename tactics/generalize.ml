@@ -319,6 +319,7 @@ let mk_term_eq homogeneous env sigma ty t ty' t' =
     sigma, (heq, hrefl)
 
 let make_abstract_generalize env id typ concl dep ctx body c eqs args refls =
+  let ctx = Context.Rel.of_list ctx in
   let open Context.Rel.Declaration in
   Refine.refine_with_principal ~typecheck:true begin fun sigma ->
   let eqslen = List.length eqs in
@@ -335,7 +336,7 @@ let make_abstract_generalize env id typ concl dep ctx body c eqs args refls =
     (* Abstract by equalities *)
   let eqs = lift_togethern 1 eqs in (* lift together and past genarg *)
   let abseqs = it_mkProd_or_LetIn (lift eqslen abshypeq)
-      (List.map (fun x -> LocalAssum (make_annot Anonymous ERelevance.relevant, x)) eqs)
+      (Context.Rel.of_list (List.map (fun x -> LocalAssum (make_annot Anonymous ERelevance.relevant, x)) eqs))
   in
   let r = ERelevance.relevant in (* TODO relevance *)
   let decl = match body with

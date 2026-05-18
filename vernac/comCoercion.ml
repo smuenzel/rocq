@@ -118,9 +118,9 @@ let get_source env lp source =
          | [] -> raise Not_found
          | LocalDef _ :: lt -> aux lt
          | LocalAssum (_,t1) :: lt ->
-            let cl1,u1,lv1 = find_class_type (push_rel_context lt env) Evd.empty (EConstr.of_constr t1) in
+            let cl1,u1,lv1 = find_class_type (push_rel_context (Context.Rel.of_list lt) env) Evd.empty (EConstr.of_constr t1) in
             cl1,lt,lv1,1
-       in aux lp
+       in aux (Context.Rel.to_list lp)
     | Some cl ->
        (* Take the first argument that matches *)
        let rec aux env acc = function
@@ -129,10 +129,10 @@ let get_source env lp source =
          | LocalAssum (_,t1) as decl :: lt ->
             try
               let cl1,u1,lv1 = find_class_type env Evd.empty (EConstr.of_constr t1) in
-              if cl_typ_eq cl cl1 then cl1,acc,lv1,Context.Rel.nhyps lt+1
+              if cl_typ_eq cl cl1 then cl1,acc,lv1,Context.Rel.nhyps (Context.Rel.of_list lt)+1
               else raise Not_found
             with Not_found -> aux (push_rel decl env) (decl::acc) lt
-       in aux env [] (List.rev lp)
+       in aux env [] (List.rev (Context.Rel.to_list lp))
 
 let get_target env lp t ind =
   if (ind > 1) then
@@ -194,7 +194,7 @@ let build_id_coercion ?loc idf_opt source poly =
   let typ_f =
     List.fold_left (fun d c -> mkProd_wo_LetIn c d)
       (mkProd (make_annot Anonymous r, vs_app, EConstr.Vars.lift 1 t))
-      lams
+      (Context.Rel.to_list lams)
   in
   (* juste pour verification *)
   let sigma, val_t = Typing.type_of env sigma val_f in
@@ -301,7 +301,7 @@ let add_new_coercion_core coef stre ~reversible source target isid : unit =
   let t, _ = Typeops.type_of_global_in_context env coef in
   if coercion_exists coef then raise (CoercionError AlreadyExists);
   let lp,tg = decompose_prod_decls t in
-  let llp = List.length lp in
+  let llp = Context.Rel.length lp in
   if Int.equal llp 0 then raise (CoercionError NotAFunction);
   let (cls,ctx,lvs,ind) =
     try
@@ -311,7 +311,7 @@ let add_new_coercion_core coef stre ~reversible source target isid : unit =
   in
   check_source (Some cls);
   if not (uniform_cond Evd.empty (* FIXME - for when possibly called with unresolved evars in the future *)
-                          ctx lvs) then
+                          (Context.Rel.of_list ctx) lvs) then
     warn_uniform_inheritance coef;
   let clt =
     try
@@ -326,7 +326,7 @@ let add_new_coercion_core coef stre ~reversible source target isid : unit =
   | `LOCAL -> true
   | `GLOBAL -> false
   in
-  let params = List.length (Context.Rel.instance_list EConstr.mkRel 0 ctx) in
+  let params = List.length (Context.Rel.instance_list EConstr.mkRel 0 (Context.Rel.of_list ctx)) in
   declare_coercion coef ~local ~reversible ~isid ~src:cls ~target:clt ~params ()
 
 let try_add_new_coercion_core ref ~local c ~reversible d e =

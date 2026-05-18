@@ -231,14 +231,16 @@ let change_property_sort evd toSort princ princName =
   in
   let init =
     let nargs =
-      princ_info.Induction.nparams + List.length princ_info.Induction.predicates
+      princ_info.Induction.nparams + Context.Rel.length princ_info.Induction.predicates
     in
     Constr.mkApp
       ( EConstr.Unsafe.to_constr princName_as_constr
       , Array.init nargs (fun i -> Constr.mkRel (nargs - i)) )
   in
   let evd, predicates =
-    List.fold_left_map change_sort_in_predicate evd princ_info.Induction.predicates
+    let pred_list = Context.Rel.to_list princ_info.Induction.predicates in
+    let evd, pred_list = List.fold_left_map change_sort_in_predicate evd pred_list in
+    evd, Context.Rel.of_list pred_list
   in
   ( evd
   , Term.it_mkLambda_or_LetIn
@@ -457,9 +459,9 @@ let generate_type env evd g_to_f f graph =
   evd := sigma;
   let ctxt, _ = decompose_prod_decls !evd graph_arity in
   let fun_ctxt, res_type =
-    match ctxt with
+    match Context.Rel.to_list ctxt with
     | [] | [_] -> CErrors.anomaly (Pp.str "Not a valid context.")
-    | decl :: fun_ctxt -> (fun_ctxt, RelDecl.get_type decl)
+    | decl :: fun_ctxt -> (Context.Rel.of_list fun_ctxt, RelDecl.get_type decl)
   in
   let rec args_from_decl i accu = function
     | [] -> accu
@@ -472,7 +474,7 @@ let generate_type env evd g_to_f f graph =
   let filter decl =
     match RelDecl.get_name decl with Name id -> Some id | Anonymous -> None
   in
-  let named_ctxt = Id.Set.of_list (List.map_filter filter fun_ctxt) in
+  let named_ctxt = Id.Set.of_list (List.map_filter filter (Context.Rel.to_list fun_ctxt)) in
   let res_id =
     Namegen.next_ident_away_in_goal env (Id.of_string "_res") named_ctxt
   in
@@ -481,7 +483,7 @@ let generate_type env evd g_to_f f graph =
       (Id.Set.add res_id named_ctxt)
   in
   (*i we can then type the argument to be applied to the function [f] i*)
-  let args_as_rels = Array.of_list (args_from_decl 1 [] fun_ctxt) in
+  let args_as_rels = Array.of_list (args_from_decl 1 [] (Context.Rel.to_list fun_ctxt)) in
   (*i
     the hypothesis [res = fv] can then be computed
     We will need to lift it by one in order to use it as a conclusion
@@ -494,7 +496,7 @@ let generate_type env evd g_to_f f graph =
     The hypothesis [graph\ x_1\ldots x_n\ res] can then be computed
     We will need to lift it by one in order to use it as a conclusion
     i*)
-  let args_and_res_as_rels = Array.of_list (args_from_decl 3 [] fun_ctxt) in
+  let args_and_res_as_rels = Array.of_list (args_from_decl 3 [] (Context.Rel.to_list fun_ctxt)) in
   let args_and_res_as_rels = Array.append args_and_res_as_rels [|mkRel 1|] in
   let graph_applied = mkApp (graph, args_and_res_as_rels) in
   (*i The [pre_context]  is the defined to be the context corresponding to
@@ -506,7 +508,7 @@ let generate_type env evd g_to_f f graph =
          ( Context.make_annot (Name fv_id) ERelevance.relevant
          , mkApp (f, args_as_rels)
          , res_type )
-    :: fun_ctxt
+    :: Context.Rel.to_list fun_ctxt
   in
   (*i and we can return the solution depending on which lemma type we are defining i*)
   if g_to_f then
@@ -612,7 +614,7 @@ let prove_fun_correct evd graphs_constr schemes lemmas_types_infos i :
       in
       let ids = principle_id :: ids in
       (* We get the branches of the principle *)
-      let branches = List.rev princ_infos.Induction.branches in
+      let branches = Context.Rel.rev princ_infos.Induction.branches in
       (* and built the intro pattern for each of them *)
       let intro_pats =
         List.map
@@ -621,9 +623,9 @@ let prove_fun_correct evd graphs_constr schemes lemmas_types_infos i :
               (fun id ->
                 CAst.make @@ Tactypes.IntroNaming (Namegen.IntroIdentifier id))
               (generate_fresh_id (Id.of_string "y") ids
-                 (List.length
+                 (Context.Rel.length
                     (fst (decompose_prod_decls evd (RelDecl.get_type decl))))))
-          branches
+          (Context.Rel.to_list branches)
       in
       (* before building the full intro pattern for the principle *)
       let eq_ind = make_eq () in
@@ -746,9 +748,8 @@ let prove_fun_correct evd graphs_constr schemes lemmas_types_infos i :
             | hres :: res :: decl :: ctxt ->
               let res =
                 EConstr.it_mkLambda_or_LetIn
-                  (EConstr.it_mkProd_or_LetIn concl [hres; res])
-                  ( LocalAssum (RelDecl.get_annot decl, RelDecl.get_type decl)
-                  :: ctxt )
+                  (EConstr.it_mkProd_or_LetIn concl (Context.Rel.of_list [hres; res]))
+                  (Context.Rel.of_list (LocalAssum (RelDecl.get_annot decl, RelDecl.get_type decl) :: ctxt))
               in
               res)
           lemmas_types_infos
@@ -772,7 +773,7 @@ let prove_fun_correct evd graphs_constr schemes lemmas_types_infos i :
               in
               (p :: bindings, id :: avoid))
             ([], Tacmach.pf_ids_of_hyps g)
-            princ_infos.params (List.rev params)
+            (Context.Rel.to_list princ_infos.params) (List.rev params)
         in
         let lemmas_bindings =
           List.rev
@@ -788,7 +789,7 @@ let prove_fun_correct evd graphs_constr schemes lemmas_types_infos i :
                         (Proofview.Goal.sigma g) p
                       :: bindings
                     , id :: avoid ))
-                  ([], avoid) princ_infos.predicates lemmas))
+                  ([], avoid) (Context.Rel.to_list princ_infos.predicates) lemmas))
         in
         params_bindings @ lemmas_bindings
       in
@@ -1052,7 +1053,7 @@ let prove_fun_complete funcs graphs schemes lemmas_types_infos i :
         Array.map
           (fun (_, (ctxt, concl)) ->
             Reductionops.nf_zeta (Proofview.Goal.env g) (Proofview.Goal.sigma g)
-              (EConstr.it_mkLambda_or_LetIn concl ctxt))
+              (EConstr.it_mkLambda_or_LetIn concl (Context.Rel.of_list ctxt)))
           lemmas_types_infos
       in
       (* We get the constant and the principle corresponding to this lemma *)
@@ -1082,7 +1083,7 @@ let prove_fun_complete funcs graphs schemes lemmas_types_infos i :
           let ids = res :: hres :: graph_principle_id :: ids in
           (* we also compute fresh names for each hyptohesis of each branch
              of the principle *)
-          let branches = List.rev princ_infos.branches in
+          let branches = Context.Rel.to_list (Context.Rel.rev princ_infos.branches) in
           let intro_pats =
             List.map
               (fun decl ->
@@ -1437,7 +1438,7 @@ let derive_correctness (funs : Constant.t EConstr.puniverses list) (graphs : ind
             let type_info = (type_of_lemma_ctxt, type_of_lemma_concl) in
             graphs_constr.(i) <- graph;
             let type_of_lemma =
-              EConstr.it_mkProd_or_LetIn type_of_lemma_concl type_of_lemma_ctxt
+              EConstr.it_mkProd_or_LetIn type_of_lemma_concl (Context.Rel.of_list type_of_lemma_ctxt)
             in
             let sigma, _ = Typing.type_of env !evd type_of_lemma in
             evd := sigma;
@@ -1508,7 +1509,7 @@ let derive_correctness (funs : Constant.t EConstr.puniverses list) (graphs : ind
             let type_info = (type_of_lemma_ctxt, type_of_lemma_concl) in
             graphs_constr.(i) <- graph;
             let type_of_lemma =
-              EConstr.it_mkProd_or_LetIn type_of_lemma_concl type_of_lemma_ctxt
+              EConstr.it_mkProd_or_LetIn type_of_lemma_concl (Context.Rel.of_list type_of_lemma_ctxt)
             in
             let type_of_lemma = Reductionops.nf_zeta env !evd type_of_lemma in
             observe

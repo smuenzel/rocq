@@ -83,19 +83,19 @@ let return_clause env sigma ind u params ((nas, p),_) =
     let mip = mib.mind_packets.(snd ind) in
     let paramdecl = subst_instance_context u mib.mind_params_ctxt in
     let paramsubst = subst_of_rel_context_instance paramdecl params in
-    let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
+    let realdecls = Context.Rel.firstn mip.mind_nrealdecls mip.mind_arity_ctxt in
     let self =
       let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
       let inst = Instance.(abstract_instance (length u)) in
       mkApp (mkIndU (ind, inst), args)
     in
     let na = Context.make_annot Anonymous mip.mind_relevance in
-    let realdecls = LocalAssum (na, self) :: realdecls in
-    let realdecls = instantiate_context u paramsubst nas realdecls in
-    List.map EConstr.of_rel_decl realdecls, p
+    let realdecls = Context.Rel.add (LocalAssum (na, self)) realdecls in
+    let realdecls = instantiate_context u paramsubst nas (Context.Rel.to_list realdecls) in
+    Context.Rel.of_list (List.map EConstr.of_rel_decl realdecls), p
   with e when CErrors.noncritical e ->
     let dummy na = LocalAssum (na, EConstr.mkProp) in
-    List.rev (Array.map_to_list dummy nas), p
+    Context.Rel.of_list (List.rev (Array.map_to_list dummy nas)), p
 
 let branch env sigma (ind, i) u params (nas, br) =
   let nas : Name.t EConstr.binder_annot array = nas in
@@ -111,12 +111,12 @@ let branch env sigma (ind, i) u params (nas, br) =
     let paramdecl = subst_instance_context u mib.mind_params_ctxt in
     let paramsubst = subst_of_rel_context_instance paramdecl params in
     let (ctx, _) = mip.mind_nf_lc.(i - 1) in
-    let ctx, _ = List.chop mip.mind_consnrealdecls.(i - 1) ctx in
+    let ctx, _ = List.chop mip.mind_consnrealdecls.(i - 1) (Context.Rel.to_list ctx) in
     let ctx = instantiate_context u paramsubst nas ctx in
-    List.map EConstr.of_rel_decl ctx, br
+    Context.Rel.of_list (List.map EConstr.of_rel_decl ctx), br
   with e when CErrors.noncritical e ->
     let dummy na = LocalAssum (na, EConstr.mkProp) in
-    List.rev (Array.map_to_list dummy nas), br
+    Context.Rel.of_list (List.rev (Array.map_to_list dummy nas)), br
 
 end
 
@@ -462,7 +462,8 @@ let update_name ~flags sigma na ((_,(e,_)),c) =
   | _ ->
       na
 
-let decomp_branch flags e sigma (ctx, c) =
+let decomp_branch flags e sigma (ctx0, c) =
+  let ctx = Context.Rel.to_list ctx0 in
   let n = List.length ctx in
   let rec aux i nal (avoid, env as e) c =
     if Int.equal i 0 then (List.rev nal,(e,c))
@@ -476,7 +477,7 @@ let decomp_branch flags e sigma (ctx, c) =
     let na',avoid' = compute_name sigma ~let_in ~pattern:true flags avoid env (get_name decl) c in
     aux (i - 1) (na'::nal) (avoid', add_name (set_name na' decl) env) c
   in
-  aux n [] e (EConstr.it_mkLambda_or_LetIn c ctx)
+  aux n [] e (EConstr.it_mkLambda_or_LetIn c (Context.Rel.of_list ctx))
 
 let rec build_tree ~flags na isgoal e sigma (ci, u, pms, cl) =
   let map i br =
@@ -561,7 +562,7 @@ let it_destRLambda_or_LetIn_names l c =
 let get_ind_tag env ind p =
   if Environ.mem_mind (fst ind) env then
     let (mib, mip) = Inductive.lookup_mind_specif env ind in
-    Context.Rel.to_tags (List.firstn mip.mind_nrealdecls mip.mind_arity_ctxt)
+    Context.Rel.to_tags (Context.Rel.firstn mip.mind_nrealdecls mip.mind_arity_ctxt)
   else
     let (nas, _), _ = p in
     Array.map_to_list (fun _ -> false) nas
@@ -569,7 +570,7 @@ let get_ind_tag env ind p =
 let get_cstr_tags env ind bl =
   if Environ.mem_mind (fst ind) env then
     let (mib, mip) = Inductive.lookup_mind_specif env ind in
-    Array.map2 (fun (d, _) n -> Context.Rel.to_tags (List.firstn n d))
+    Array.map2 (fun (d, _) n -> Context.Rel.to_tags (Context.Rel.firstn n d))
       mip.mind_nf_lc mip.mind_consnrealdecls
   else
     let map (nas, _) = Array.map_to_list (fun _ -> false) nas in
@@ -967,7 +968,7 @@ and detype_eqn d flags avoid env sigma u pms constr br =
 
       | _ -> assert false
   in
-  buildrec Id.Set.empty [] avoid env (List.length ctx) branch
+  buildrec Id.Set.empty [] avoid env (Context.Rel.length ctx) branch
 
 and detype_binder d flags bk avoid env sigma decl c =
   let na = get_name decl in
@@ -1024,7 +1025,7 @@ let detype d ~flags ?(isgoal=false) ?avoid env sigma t =
 let detype_rel_context d ~flags ?avoid env sigma sign =
   let flags = { flg = flags; flg_isgoal = false; } in
   let avoid = Avoid.make ~fast:flags.flg.fast_names avoid in
-  detype_rel_context d flags avoid env sigma sign
+  detype_rel_context d flags avoid env sigma (Context.Rel.to_list sign)
 
 let detype_closed_glob ~flags ?isgoal ?avoid env sigma t =
   let convert_id cl id =
@@ -1048,7 +1049,7 @@ let detype_closed_glob ~flags ?isgoal ?avoid env sigma t =
              but I'm computing the detyping environment like
              [Printer.pr_constr_under_binders_env] does. *)
           let assums = List.map (fun id -> LocalAssum (make_annot (Name id) ERelevance.relevant,(* dummy *) mkProp)) b in
-          let env = push_rel_context assums env in
+          let env = push_rel_context (Context.Rel.of_list assums) env in
           DAst.get (detype Now ~flags ?isgoal ?avoid env sigma c)
         (* if [id] is bound to a [closed_glob_constr]. *)
         with Not_found -> try

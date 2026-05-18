@@ -175,7 +175,7 @@ let ll_ind_tac ~flags (ind,u as indu) largs backtrack id continue seq =
              (* construire le terme  H->B, le generaliser etc *)
      let myterm idc i=
        let rc=rcs.(i) in
-       let p=List.length rc in
+       let p=Context.Rel.length rc in
        let u = EInstance.make u in
        let cstr=mkApp ((mkConstructU ((ind,(i+1)),u)),vargs) in
        let vars=Array.init p (fun j->mkRel (p-j)) in

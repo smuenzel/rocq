@@ -524,7 +524,7 @@ let build_combined_scheme env schemes =
     list_split_rev_at prods
       (List.rev_map (fun (x, y) -> Context.Rel.Declaration.LocalAssum (x, y)) ctx) in
   let typ = EConstr.of_constr @@ List.fold_left (fun d c -> Term.mkProd_wo_LetIn c d) concl_typ ctx in
-  let body = EConstr.of_constr @@ it_mkLambda_or_LetIn concl_bod ctx in
+  let body = EConstr.of_constr @@ it_mkLambda_or_LetIn concl_bod (Context.Rel.of_list ctx) in
   let sigma = Typing.check env sigma body typ in
   (sigma, body, typ)
 

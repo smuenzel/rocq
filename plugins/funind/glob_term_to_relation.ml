@@ -337,7 +337,7 @@ let add_pat_variables sigma pat typ env : Environ.env =
           (Array.to_list constructors)
       in
       let cs_args_types : EConstr.types list =
-        List.map RelDecl.get_type constructor.Inductiveops.cs_args
+        List.map RelDecl.get_type (Context.Rel.to_list constructor.Inductiveops.cs_args)
       in
       List.fold_left2 add_pat_variables env patl (List.rev cs_args_types)
   in
@@ -408,7 +408,7 @@ let rec pattern_to_term_and_type env typ =
           (Array.to_list constructors)
       in
       let cs_args_types : EConstr.types list =
-        List.map RelDecl.get_type constructor.Inductiveops.cs_args
+        List.map RelDecl.get_type (Context.Rel.to_list constructor.Inductiveops.cs_args)
       in
       let _, cstl = Inductiveops.dest_ind_family indf in
       let csta = Array.of_list cstl in

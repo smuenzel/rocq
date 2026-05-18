@@ -115,7 +115,7 @@ let interp_statement ~program_mode env evd ~(flags : Pretyping.inference_flags) 
   let poly = Pretyping.(flags.poly) in
   let evd, (impls, ((env, ctx), imps, _locs)) = Constrintern.interp_context_evars ~poly ~program_mode env evd bl in
   let evd, (t', imps') = Constrintern.interp_type_evars_impls ~flags ~impls env evd typ in
-  let ids = List.map Context.Rel.Declaration.get_name ctx in
+  let ids = List.map Context.Rel.Declaration.get_name (Context.Rel.to_list ctx) in
   evd, ids, EConstr.it_mkProd_or_LetIn t' ctx, imps @ imps'
 
 let do_definition ?loc ?hook ~name ?scope ?clearbody ~poly ?typing_flags ~kind ?using ?user_warns udecl bl red_option c ctypopt =

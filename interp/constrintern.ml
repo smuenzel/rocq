@@ -2364,7 +2364,7 @@ let intern_case_item self genv env lvar forbidden_names_for_gen (tm,na,t) =
       let (ind,ind_ids,alias_subst,l) =
         intern_ind_pattern genv (snd lvar) (env_for_pattern (set_type_scope env)) t in
       let (mib,mip) = Inductive.lookup_mind_specif genv ind in
-      let nparams = (List.length (mib.Declarations.mind_params_ctxt)) in
+      let nparams = (Context.Rel.length (mib.Declarations.mind_params_ctxt)) in
       (* for "in Vect n", we answer (["n","n"],[(loc,"n")])
 
          for "in Vect (S n)", we answer ((match over "m", relevant branch is "S
@@ -2394,7 +2394,7 @@ let intern_case_item self genv env lvar forbidden_names_for_gen (tm,na,t) =
             end
           | _ -> assert false in
         let _,args_rel =
-          List.chop nparams (List.rev mip.Declarations.mind_arity_ctxt) in
+          List.chop nparams (Context.Rel.to_list (Context.Rel.rev mip.Declarations.mind_arity_ctxt)) in
         canonize_args args_rel l forbidden_names_for_gen [] [] in
       (Id.Set.of_list (List.map (fun id -> id.CAst.v) ind_ids),alias_subst,match_to_do),
       Some (CAst.make ?loc:(cases_pattern_expr_loc t) (ind,List.rev_map (fun x -> x.v) nal))
@@ -3113,7 +3113,10 @@ let interp_named_context_evars ?program_mode ?unconstrained_sorts ?poly ?impl_en
   interp_context_evars_gen ?program_mode ?unconstrained_sorts ?poly ?impl_env ?autoimp_enable ~dump:false env sigma make_decl EConstr.push_named bl
 
 let interp_context_evars ?program_mode ?unconstrained_sorts ?poly ?impl_env env sigma bl =
-  interp_context_evars_gen ?program_mode ?unconstrained_sorts ?poly ?impl_env ~autoimp_enable:false ~dump:true env sigma (fun ?loc d -> d) EConstr.push_rel bl
+  let sigma, (impls, ((env, bl), impl_list, locs)) =
+    interp_context_evars_gen ?program_mode ?unconstrained_sorts ?poly ?impl_env ~autoimp_enable:false ~dump:true env sigma (fun ?loc d -> d) EConstr.push_rel bl
+  in
+  sigma, (impls, ((env, Context.Rel.of_list bl), impl_list, locs))
 
 (** Local universe and constraint declarations. *)
 

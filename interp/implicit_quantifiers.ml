@@ -196,7 +196,7 @@ let implicit_application env ty =
   | None -> ty, env
   | Some (c, {CAst.loc;v=(id, par, inst)}) ->
     let avoid = Id.Set.union env (Id.Set.of_list (free_vars_of_constr_expr ty ~bound:env [])) in
-    let args, avoid = combine_params (Global.env ()) avoid par (List.rev c.cl_context) in
+    let args, avoid = combine_params (Global.env ()) avoid par (Context.Rel.to_list (Context.Rel.rev c.cl_context)) in
     CAst.make ?loc @@ CAppExpl ((id, inst), args), avoid
 
 let warn_ignoring_implicit_status =

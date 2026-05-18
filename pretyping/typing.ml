@@ -31,7 +31,7 @@ let fresh_template_context env0 sigma ind (mib, _ as spec) ?(refresh_all=false) 
   | None -> assert false
   | Some t -> Array.of_list t.template_param_arguments
   in
-  let ctx = List.rev (EConstr.of_rel_context mib.Declarations.mind_params_ctxt) in
+  let ctx = Context.Rel.to_list (Context.Rel.rev (EConstr.of_rel_context mib.Declarations.mind_params_ctxt)) in
   let rec freshen i env sigma accu sorts = function
   | [] -> sigma, List.rev sorts
   | LocalAssum (na, t) as decl :: ctx ->
@@ -215,7 +215,7 @@ let is_correct_arity env sigma c pj ind specif params =
     | _ ->
         error None
   in
-  srec env sigma pj.uj_type (List.rev arsign)
+  srec env sigma pj.uj_type (List.rev (Context.Rel.to_list arsign))
 
 let lambda_applist_decls sigma n c l =
   let rec app n subst t l =

@@ -754,24 +754,24 @@ and match_rigid_arg_pattern whrec env sigma ctx psubst p t =
     let na = List.length ntys and np = Array.length ptys in
     if np > na then raise PatternFailure;
     let ntys, body = EConstr.decompose_lambda_n sigma np t in
-    let ctx' = List.map (fun (n, ty) -> Context.Rel.Declaration.LocalAssum (n, ty)) ntys in
+    let ctx' = Context.Rel.of_list (List.map (fun (n, ty) -> Context.Rel.Declaration.LocalAssum (n, ty)) ntys) in
     let tys = Array.of_list @@ List.rev_map snd ntys in
     let na = Array.length tys in
-    let contexts_upto = Array.init na (fun i -> List.skipn (na - i) ctx' @ ctx) in
+    let contexts_upto = Array.init na (fun i -> Context.Rel.append (Context.Rel.skipn (na - i) ctx') ctx) in
     let psubst = Array.fold_left3 (fun psubst ctx -> match_arg_pattern whrec env sigma ctx psubst) psubst contexts_upto ptys tys in
-    let psubst = match_arg_pattern whrec env sigma (ctx' @ ctx) psubst (ERigid pbod) body in
+    let psubst = match_arg_pattern whrec env sigma (Context.Rel.append ctx' ctx) psubst (ERigid pbod) body in
     psubst
   | PHProd (ptys, pbod), _ ->
     let ntys, _ = EConstr.decompose_prod sigma t in
     let na = List.length ntys and np = Array.length ptys in
     if np > na then raise PatternFailure;
     let ntys, body = EConstr.decompose_prod_n sigma np t in
-    let ctx' = List.map (fun (n, ty) -> Context.Rel.Declaration.LocalAssum (n, ty)) ntys in
+    let ctx' = Context.Rel.of_list (List.map (fun (n, ty) -> Context.Rel.Declaration.LocalAssum (n, ty)) ntys) in
     let tys = Array.of_list @@ List.rev_map snd ntys in
     let na = Array.length tys in
-    let contexts_upto = Array.init na (fun i -> List.skipn (na - i) ctx' @ ctx) in
+    let contexts_upto = Array.init na (fun i -> Context.Rel.append (Context.Rel.skipn (na - i) ctx') ctx) in
     let psubst = Array.fold_left3 (fun psubst ctx -> match_arg_pattern whrec env sigma ctx psubst) psubst contexts_upto ptys tys in
-    let psubst = match_arg_pattern whrec env sigma (ctx' @ ctx) psubst pbod body in
+    let psubst = match_arg_pattern whrec env sigma (Context.Rel.append ctx' ctx) psubst pbod body in
     psubst
   | (PHInd _ | PHConstr _ | PHRel _ | PHSort _ | PHSymbol _ | PHInt _ | PHFloat _ | PHString _), _ -> raise PatternFailure
 
@@ -794,8 +794,8 @@ and apply_rule whrec env sigma ctx psubst es stk =
       if not @@ QInd.equal env pind ci.ci_ind then raise PatternFailure;
       let dummy = mkProp in
       let (_, _, _, ((ntys_ret, ret), _), _, _, brs) = EConstr.annotate_case env sigma (ci, u, pms, p, NoInvert, dummy, brs) in
-      let psubst = match_arg_pattern whrec env sigma (ntys_ret @ ctx) psubst pret ret in
-      let psubst = Array.fold_left2 (fun psubst pat (ctx', br) -> match_arg_pattern whrec env sigma (ctx' @ ctx) psubst pat br) psubst pbrs brs in
+      let psubst = match_arg_pattern whrec env sigma (Context.Rel.append ntys_ret ctx) psubst pret ret in
+      let psubst = Array.fold_left2 (fun psubst pat (ctx', br) -> match_arg_pattern whrec env sigma (Context.Rel.append ctx' ctx) psubst pat br) psubst pbrs brs in
       apply_rule whrec env sigma ctx psubst e s
   | Declarations.PEProj proj :: e, Stack.Proj (proj', r) :: s ->
       if not @@ QProjection.Repr.equal env proj (Projection.repr proj') then raise PatternFailure;
@@ -811,7 +811,7 @@ let rec apply_rules whrec env sigma u r stk =
     try
       let psubst = Partial_subst.make nvars in
       let psubst = match_einstance sigma pu u psubst in
-      let psubst, stk = apply_rule whrec env sigma [] psubst elims stk in
+      let psubst, stk = apply_rule whrec env sigma Context.Rel.empty psubst elims stk in
       let subst, qsubst, usubst = Partial_subst.to_arrays psubst in
       let usubst = UVars.Instance.of_array (qsubst, usubst) in
       let rhsu = subst_instance_constr (EConstr.EInstance.make usubst) (EConstr.of_constr rhs) in
@@ -1745,6 +1745,6 @@ let eta_expand env sigma t ty =
 
 let eta_expand_instantiation env sigma inst ctxt =
   let inst = Array.map (EConstr.Unsafe.to_constr) inst in
-  let ctxt =  List.map (EConstr.Unsafe.to_rel_decl) ctxt in
+  let ctxt =  Context.Rel.of_list (List.map (EConstr.Unsafe.to_rel_decl) (Context.Rel.to_list ctxt)) in
   let eta_inst = Termops.eta_expand_instantiation ~evars:(Evd.evar_handler sigma) env inst ctxt in
   Array.map of_constr eta_inst

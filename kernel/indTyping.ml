@@ -198,8 +198,8 @@ let check_constructors ~env_params ~env_ar_par isrecord params lc (arity,indices
          things easier on ourselves when reducing we forbid letins)
          unless ind_univ is sort polymorphic (for ease of implementation) *)
       if (Environ.typing_flags env_ar_par).allow_uip
-           && fst (splayed_lc.(0)) = []
-           && List.for_all Context.Rel.Declaration.is_local_assum params
+           && Context.Rel.length (fst (splayed_lc.(0))) = 0
+           && List.for_all Context.Rel.Declaration.is_local_assum (Context.Rel.to_list params)
            && Sorts.is_sprop univ_info.ind_univ
       then univ_info
       (* 1 constructor with arguments must squash if SProp / sort poly
@@ -247,6 +247,7 @@ let check_record data =
           (* XXX if we stop needing compatibility constants we could allow anonymous projections *)
           | [|ctx,_|] ->
             let module D = Context.Rel.Declaration in
+            let ctx = Context.Rel.to_list ctx in
             if not @@ List.exists D.is_local_assum ctx
             then Some MustHaveProj
             else if List.exists (fun d -> D.is_local_assum d && Name.is_anonymous (D.get_name d)) ctx
@@ -380,11 +381,12 @@ let get_template (mie:mutual_inductive_entry) = match mie.mind_entry_universes w
     else check_not_appearing_univs ~template_univs us
   in
   let check_not_appearing_rel_ctx ctx =
-    List.iter (Context.Rel.Declaration.iter_constr check_not_appearing) ctx
+    List.iter (Context.Rel.Declaration.iter_constr check_not_appearing) (Context.Rel.to_list ctx)
   in
 
   (** params *)
   (* for each non-letin param, find whether it binds a template univ or qvar *)
+  let params_list = Context.Rel.to_list params in
   let template_params =
     CList.map (fun param ->
         match param with
@@ -400,7 +402,7 @@ let get_template (mie:mutual_inductive_entry) = match mie.mind_entry_universes w
           | Some (decls, qopt, lopt, s) ->
             let () = check_not_appearing_rel_ctx decls in
             Some (Some (qopt, lopt, s)))
-      params
+      params_list
   in
   let qbound, ubound =
     List.fold_left (fun (qbound, ubound as bound_in_params) -> function
@@ -543,7 +545,7 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
   in
   (* Check unicity of names (redundant with safe_typing's add_field checks) *)
   mind_check_names env mie;
-  assert (List.is_empty (Environ.rel_context env));
+  assert (Context.Rel.length (Environ.rel_context env) = 0);
 
   (* universes *)
   let mie, template_usubst, template = get_template mie in

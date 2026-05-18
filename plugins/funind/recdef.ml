@@ -1651,7 +1651,7 @@ let recursive_definition ~interactive_proof ~is_mes function_name rec_impls
   let res_vars, eq' = decompose_prod equation_lemma_type in
   let env_eq' =
     Environ.push_rel_context
-      (List.map (fun (x, y) -> LocalAssum (x, y)) res_vars)
+      (Context.Rel.of_list (List.map (fun (x, y) -> LocalAssum (x, y)) res_vars))
       env
   in
   let eq' = Reductionops.nf_zeta env_eq' evd (EConstr.of_constr eq') in
@@ -1684,7 +1684,7 @@ let recursive_definition ~interactive_proof ~is_mes function_name rec_impls
   let evd = Evd.from_env (Global.env ()) in
   let env_with_pre_rec_args =
     push_rel_context
-      (List.map (function x, t -> LocalAssum (x, t)) pre_rec_args)
+      (Context.Rel.of_list (List.map (function x, t -> LocalAssum (x, t)) pre_rec_args))
       env
   in
   let relation, evuctx = interp_constr env_with_pre_rec_args evd r in

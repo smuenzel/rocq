@@ -225,11 +225,24 @@ struct
       Outer-most declarations are at the end of the list. *)
   type ('constr, 'types, 'r) pt = ('constr, 'types, 'r) Declaration.pt list
 
+  let to_list ctx = ctx
+  let of_list ctx = ctx
+
   (** empty rel-context *)
   let empty = []
 
+  let is_empty = List.is_empty
+
   (** Return a new rel-context enriched by with a given inner-most declaration. *)
   let add d ctx = d :: ctx
+
+  let append ctx1 ctx2 = ctx1 @ ctx2
+
+  let rev = List.rev
+
+  let firstn n ctx = List.firstn n ctx
+
+  let skipn n ctx = List.skipn n ctx
 
   (** Return the number of {e local declarations} in a given rel-context. *)
   let length = List.length
