@@ -578,12 +578,14 @@ let get_arity env ((ind,u),params) =
       snd (Inductive.inductive_nonrec_rec_paramdecls (mib,u))
     end in
   let arproperlength = Context.Rel.length mip.mind_arity_ctxt - Context.Rel.length parsign in
-  let arsign = snd (List.chop arproperlength (Context.Rel.to_list mip.mind_arity_ctxt)) in
+  let arsign, _ = List.chop arproperlength (Context.Rel.to_list mip.mind_arity_ctxt) in
+  let arsign = EConstr.of_rel_context (Context.Rel.of_list arsign) in
   let parsign_ec = EConstr.of_rel_context parsign in
-  let arsign_ec = EConstr.of_rel_context (Context.Rel.of_list arsign) in
-  let arsign_ec = Vars.subst_instance_context u arsign_ec in
   let subst = subst_of_rel_context_instance_list parsign_ec params in
-  Context.Rel.of_list (substl_rel_context subst (Context.Rel.to_list arsign_ec))
+  let arsign = EConstr.Vars.subst_instance_context u arsign in
+  let arsign = Context.Rel.to_list arsign in
+  let arsign = substl_rel_context subst arsign in
+  Context.Rel.of_list arsign
 
 (* Functions to build standard types related to inductive *)
 let build_dependent_constructor cs =

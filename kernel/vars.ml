@@ -412,7 +412,10 @@ let subst_univs_level_constr subst c =
       if !changed then c' else c
 
 let subst_univs_level_context s ctx =
-  Context.Rel.map_with_relevance (UVars.subst_sort_level_relevance s) (subst_univs_level_constr s) ctx
+  Context.Rel.of_list (CList.Smart.map (fun d ->
+      let d = RelDecl.map_relevance (UVars.subst_sort_level_relevance s) d in
+      RelDecl.map_constr (subst_univs_level_constr s) d)
+    (Context.Rel.to_list ctx))
 
 let subst_instance_constr subst c =
   if UVars.Instance.is_empty subst then c
@@ -470,7 +473,10 @@ let univ_instantiate_constr u c =
 let subst_instance_context s ctx =
   if UVars.Instance.is_empty s then ctx
   else
-    Context.Rel.map_with_relevance (UVars.subst_instance_relevance s) (subst_instance_constr s) ctx
+    Context.Rel.of_list (CList.Smart.map (fun d ->
+        let d = RelDecl.map_relevance (UVars.subst_instance_relevance s) d in
+        RelDecl.map_constr (subst_instance_constr s) d)
+      (Context.Rel.to_list ctx))
 
 type ('a,'s,'u,'r) univ_visitor = {
   visit_sort : 'a -> 's -> 'a;
