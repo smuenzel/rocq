@@ -119,7 +119,7 @@ let rec compute_params_rec_strpos_arg cache env kn uparams nparams_rec nparams i
           let uparams_nested =
             let rev_params = Context.Rel.rev mib_nested.mind_params_ctxt in
             let (uparams_pt, _) = Context.Rel.chop_nhyps mib_nested.mind_nparams_rec rev_params in
-            uparams_pt in
+            Context.Rel.rev uparams_pt in
           let inst_uparams = Termops.eta_expand_instantiation env inst_uparams uparams_nested in
           (* - appear strictly positively in the instantiation of the uniform parameters
                that are strictly postive themselves
