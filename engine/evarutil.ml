@@ -116,7 +116,7 @@ let is_ground_env evd env =
   let is_ground_named_decl = function
     | NamedDecl.LocalDef (_,b,_) -> is_ground_term evd (EConstr.of_constr b)
     | _ -> true in
-  List.for_all is_ground_rel_decl (Context.Rel.to_list (rel_context env)) &&
+  Context.Rel.for_all is_ground_rel_decl (rel_context env) &&
   List.for_all is_ground_named_decl (named_context env)
 
 (* Expand head evar if any (currently consider only applications but I

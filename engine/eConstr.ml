@@ -518,7 +518,7 @@ let to_rel_decl sigma (d:rel_declaration) : Constr.rel_declaration =
 let to_rel_context sigma (ctx:rel_context) : Constr.rel_context =
   let Refl = unsafe_eq in
   let Refl = unsafe_relevance_eq in
-  Context.Rel.of_list (List.Smart.map (to_rel_decl sigma) (Context.Rel.to_list ctx))
+  Context.Rel.map_decl (to_rel_decl sigma) ctx
 
 let to_named_decl sigma (d:named_declaration) : Constr.named_declaration =
   let Refl = unsafe_eq in

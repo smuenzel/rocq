@@ -199,7 +199,7 @@ let check_constructors ~env_params ~env_ar_par isrecord params lc (arity,indices
          unless ind_univ is sort polymorphic (for ease of implementation) *)
       if (Environ.typing_flags env_ar_par).allow_uip
            && Context.Rel.length (fst (splayed_lc.(0))) = 0
-           && List.for_all Context.Rel.Declaration.is_local_assum (Context.Rel.to_list params)
+           && Context.Rel.for_all Context.Rel.Declaration.is_local_assum params
            && Sorts.is_sprop univ_info.ind_univ
       then univ_info
       (* 1 constructor with arguments must squash if SProp / sort poly
@@ -381,7 +381,7 @@ let get_template (mie:mutual_inductive_entry) = match mie.mind_entry_universes w
     else check_not_appearing_univs ~template_univs us
   in
   let check_not_appearing_rel_ctx ctx =
-    List.iter (Context.Rel.Declaration.iter_constr check_not_appearing) (Context.Rel.to_list ctx)
+    Context.Rel.iter_decl (Context.Rel.Declaration.iter_constr check_not_appearing) ctx
   in
 
   (** params *)

@@ -190,8 +190,28 @@ sig
       position of the binder in the context starting at 1. *)
   val map_with_binders : (int -> 'c -> 'c) -> ('c, 'c, 'r) pt -> ('c, 'c, 'r) pt
 
+  (** Map a function over each declaration in the context, preserving
+      physical equality when no declaration changes. *)
+  val map_decl : (('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) Declaration.pt) ->
+    ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Keep only declarations satisfying a predicate. *)
+  val filter : (('c, 't, 'r) Declaration.pt -> bool) ->
+    ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Check whether all declarations satisfy a predicate. *)
+  val for_all : (('c, 't, 'r) Declaration.pt -> bool) ->
+    ('c, 't, 'r) pt -> bool
+
+  (** Check whether any declaration satisfies a predicate. *)
+  val exists : (('c, 't, 'r) Declaration.pt -> bool) ->
+    ('c, 't, 'r) pt -> bool
+
   (** Perform a given action on every declaration in a given rel-context. *)
   val iter : ('c -> unit) -> ('c, 'c, 'r) pt -> unit
+
+  (** Perform an action on each declaration. *)
+  val iter_decl : (('c, 't, 'r) Declaration.pt -> unit) -> ('c, 't, 'r) pt -> unit
 
   (** Reduce all terms in a given rel-context to a single value.
       Innermost declarations are processed first. *)

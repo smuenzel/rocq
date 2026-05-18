@@ -995,10 +995,10 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
       let fresh_decl = RelDecl.map_name fresh_id in
       let princ_info : elim_scheme =
         { princ_info with
-          params = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.params))
-        ; predicates = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.predicates))
-        ; branches = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.branches))
-        ; args = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.args)) }
+          params = Context.Rel.map_decl fresh_decl princ_info.params
+        ; predicates = Context.Rel.map_decl fresh_decl princ_info.predicates
+        ; branches = Context.Rel.map_decl fresh_decl princ_info.branches
+        ; args = Context.Rel.map_decl fresh_decl princ_info.args }
       in
       let get_body const =
         let env = Global.env () in
@@ -1435,10 +1435,10 @@ let prove_principle_for_gen (f_ref, functional_ref, eq_ref) tcc_lemma_ref is_mes
       let fresh_decl = map_name fresh_id in
       let princ_info : elim_scheme =
         { princ_info with
-          params = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.params))
-        ; predicates = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.predicates))
-        ; branches = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.branches))
-        ; args = Context.Rel.of_list (List.map fresh_decl (Context.Rel.to_list princ_info.args)) }
+          params = Context.Rel.map_decl fresh_decl princ_info.params
+        ; predicates = Context.Rel.map_decl fresh_decl princ_info.predicates
+        ; branches = Context.Rel.map_decl fresh_decl princ_info.branches
+        ; args = Context.Rel.map_decl fresh_decl princ_info.args }
       in
       let wf_tac =
         if is_mes then fun b ->

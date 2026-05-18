@@ -1455,7 +1455,7 @@ struct
       let cs_args = cs.cs_args in
       let cs_args = Context.Rel.map (whd_betaiota !!env sigma) cs_args in
       let csgn =
-        Context.Rel.of_list (List.map (set_name Anonymous) (Context.Rel.to_list cs_args))
+        Context.Rel.map_decl (set_name Anonymous) cs_args
       in
       let _,env_c = push_rel_context ~hypnaming sigma csgn env in
       let sigma, bj = pretype (mk_tycon pi) env_c sigma b in

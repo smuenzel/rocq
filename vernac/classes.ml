@@ -205,7 +205,7 @@ let subst_class (subst,cl) =
   let do_subst_con c = Mod_subst.subst_constant subst c
   and do_subst c = Mod_subst.subst_mps subst c
   and do_subst_gr gr = fst (subst_global subst gr) in
-  let do_subst_ctx ctx = Context.Rel.of_list (List.Smart.map (RelDecl.map_constr do_subst) (Context.Rel.to_list ctx)) in
+  let do_subst_ctx ctx = Context.Rel.map_decl (RelDecl.map_constr do_subst) ctx in
   let do_subst_meth m =
     let c = Option.Smart.map do_subst_con m.meth_const in
     if c == m.meth_const then m

@@ -286,8 +286,18 @@ struct
     in
     aux (length ctx) ctx
 
+  let map_decl f = List.Smart.map f
+
+  let filter f = List.filter f
+
+  let for_all f = List.for_all f
+
+  let exists f = List.exists f
+
   (** Perform a given action on every declaration in a given rel-context. *)
   let iter f = List.iter (Declaration.iter_constr f)
+
+  let iter_decl f = List.iter f
 
   (** Reduce all terms in a given rel-context to a single value.
       Innermost declarations are processed first. *)

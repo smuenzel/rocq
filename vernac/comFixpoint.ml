@@ -374,7 +374,7 @@ let build_fix_type sigma ctx ccl (_, extradecl) =
 let build_dummy_fix_type sigma ctx ccl (_, extradecl) =
   (* Hack: the extra declarations are smashed to a dummy non-dependent
      so as not to contribute to the computation of implicit arguments *)
-  let ccl = it_mkProd_or_LetIn (Vars.lift (Context.Rel.length extradecl) ccl) (Context.Rel.of_list (List.map (RelDecl.map_type (fun _ -> mkProp)) (Context.Rel.to_list extradecl))) in
+  let ccl = it_mkProd_or_LetIn (Vars.lift (Context.Rel.length extradecl) ccl) (Context.Rel.map_decl (RelDecl.map_type (fun _ -> mkProp)) extradecl) in
   Evarutil.nf_evar sigma (it_mkProd_or_LetIn ccl ctx)
 
 (* Wellfounded definition *)
