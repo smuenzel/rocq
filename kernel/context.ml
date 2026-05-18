@@ -223,32 +223,32 @@ struct
   (** Rel-context is represented as a list of declarations.
       Inner-most declarations are at the beginning of the list.
       Outer-most declarations are at the end of the list. *)
-  type ('constr, 'types, 'r) pt = ('constr, 'types, 'r) Declaration.pt list
+  type ('constr, 'types, 'r) pt = int * ('constr, 'types, 'r) Declaration.pt list
 
-  let to_list ctx = ctx
-  let of_list ctx = ctx
+  let to_list (_, ctx) = ctx
+  let of_list ctx = List.length ctx, ctx
 
   (** empty rel-context *)
-  let empty = []
+  let empty = 0, []
 
-  let is_empty = List.is_empty
+  let is_empty (_, ctx) = List.is_empty ctx
 
   (** Return a new rel-context enriched by with a given inner-most declaration. *)
-  let add d ctx = d :: ctx
+  let add d (n, ctx) = n+1, d :: ctx
 
-  let append ctx1 ctx2 = ctx1 @ ctx2
+  let append (n1,ctx1) (n2, ctx2) = n1 + n2, ctx1 @ ctx2
 
-  let rev = List.rev
+  let rev (n, ctx) = n, List.rev ctx
 
-  let firstn n ctx = List.firstn n ctx
+  let firstn n (n',ctx) = min n n', List.firstn n ctx
 
-  let skipn n ctx = List.skipn n ctx
+  let skipn n (n', ctx) = n'-n, List.skipn n ctx
 
   (** Return the number of {e local declarations} in a given rel-context. *)
-  let length = List.length
+  let length (n,_) = n
 
   (** Return the number of {e local assumptions} in a given rel-context. *)
-  let nhyps ctx =
+  let nhyps (_, ctx) =
     let open Declaration in
     let rec nhyps acc = function
       | [] -> acc
@@ -265,18 +265,22 @@ struct
     | n, _ :: sign -> lookup (n-1) sign
     | _, []        -> raise Not_found
 
+  let lookup n (_, ctx) = lookup n ctx
+
   (** Check whether given two rel-contexts are equal. *)
-  let equal eqr eq l = List.equal (fun c -> Declaration.equal eqr eq c) l
+  let equal eqr eq (n1, l1) (n2, l2) = n1 = n2 && List.equal (fun c -> Declaration.equal eqr eq c) l1 l2
 
   (** Map all terms in a given rel-context. *)
-  let map f = List.Smart.map (Declaration.map_constr f)
+  let map f (n, ctx) = n, List.Smart.map (Declaration.map_constr f) ctx
 
-  let map_with_relevance g f = List.Smart.map (Declaration.map_constr_with_relevance g f)
+  let map_with_relevance g f ((n, ctx) as rctx) = 
+    let result = List.Smart.map (Declaration.map_constr_with_relevance g f) ctx in
+    if result == ctx then rctx else n, result
 
-  let map_het fr f = List.map (Declaration.map_constr_het fr f)
+  let map_het fr f (n, ctx) = n, List.map (Declaration.map_constr_het fr f) ctx
 
   (** Map all terms in a given rel-context. *)
-  let map_with_binders f ctx =
+  let map_with_binders f ((n, ctx) as rctx) =
     let rec aux k = function
       | decl :: ctx as l ->
         let decl' = Declaration.map_constr (f k) decl in
@@ -284,33 +288,36 @@ struct
         if decl == decl' && ctx == ctx' then l else decl' :: ctx'
       | [] -> []
     in
-    aux (length ctx) ctx
+    let result = aux n ctx in
+    if result == ctx then rctx else n, result
 
-  let map_decl f = List.map f
+  let map_decl f (n, ctx) = n, List.map f ctx
 
-  let map_decl_smart f = List.Smart.map f
+  let map_decl_smart f ((n, ctx) as rctx) =
+    let result = List.Smart.map f ctx in
+    if result == ctx then rctx else n, result
 
-  let filter f = List.filter f
+  let filter f (_, ctx) = List.filter f ctx |> of_list
 
-  let for_all f = List.for_all f
+  let for_all f (_, ctx) = List.for_all f ctx
 
-  let exists f = List.exists f
+  let exists f (_, ctx) = List.exists f ctx
 
   (** Perform a given action on every declaration in a given rel-context. *)
-  let iter f = List.iter (Declaration.iter_constr f)
+  let iter f (_, ctx) = List.iter (Declaration.iter_constr f) ctx
 
-  let iter_decl f = List.iter f
+  let iter_decl f (_, ctx) = List.iter f ctx
 
   (** Reduce all terms in a given rel-context to a single value.
       Innermost declarations are processed first. *)
-  let fold_inside f ~init = List.fold_left f init
+  let fold_inside f ~init (_, ctx) = List.fold_left f init ctx
 
   (** Reduce all terms in a given rel-context to a single value.
       Outermost declarations are processed first. *)
-  let fold_outside f l ~init = List.fold_right f l init
+  let fold_outside f (_, l) ~init = List.fold_right f l init
 
   (** Return the set of all named variables bound in a given rel-context. *)
-  let to_vars l =
+  let to_vars (_, l) =
     List.fold_left (fun accu decl ->
         match Declaration.get_name decl with
         | Name id -> Id.Set.add id accu
@@ -319,29 +326,29 @@ struct
 
   (** Map a given rel-context to a list where each {e local definition} is mapped to [true]
       and each {e local assumption} is mapped to [false]. *)
-  let to_tags l =
+  let to_tags (_, l) =
     let rec aux l = function
       | [] -> l
       | Declaration.LocalDef _ :: ctx -> aux (true::l) ctx
       | Declaration.LocalAssum _ :: ctx -> aux (false::l) ctx
     in aux [] l
 
-  let drop_bodies l = List.Smart.map Declaration.drop_body l
+  let drop_bodies l = map_decl_smart Declaration.drop_body l
 
   (** Split a context so that the second part contains [n]
       [LocalAssum], keeping all [LocalDef] in the middle in the first part *)
-  let chop_nhyps n l =
-    let rec aux l' = function
-      | (0, l) -> (List.rev l', l)
-      | (n, (Declaration.LocalDef _ as h) :: l) -> aux (h::l') (n, l)
-      | (n, (Declaration.LocalAssum _ as h) :: l) -> aux (h::l') (n-1, l)
+  let chop_nhyps n_local_assum (n_total, l) =
+    let rec aux acc_size l' = function
+      | (0, l) -> ((acc_size, List.rev l'), (n_total - acc_size, l))
+      | (n, (Declaration.LocalDef _ as h) :: l) -> aux (acc_size + 1) (h::l') (n, l)
+      | (n, (Declaration.LocalAssum _ as h) :: l) -> aux (acc_size + 1) (h::l') (n-1, l)
       | (_, []) -> CErrors.anomaly (Pp.str "chop_nhyps: not enough hypotheses.")
-    in aux [] (n,l)
+    in aux 0 [] (n_local_assum,l)
 
   (** [extended_list n Γ] builds an instance [args] such that [Γ,Δ ⊢ args:Γ]
       with n = |Δ| and with the {e local definitions} of [Γ] skipped in
       [args]. Example: for [x:T, y:=c, z:U] and [n]=2, it gives [Rel 5, Rel 3]. *)
-  let to_extended_list mk n l =
+  let to_extended_list mk n (_, l) =
     let rec reln l p = function
       | Declaration.LocalAssum _ :: hyps -> reln (mk (n+p) :: l) (p+1) hyps
       | Declaration.LocalDef _ :: hyps -> reln l (p+1) hyps
