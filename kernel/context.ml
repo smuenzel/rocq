@@ -231,6 +231,8 @@ struct
   let to_list_map f (_, ctx) = List.map f ctx
   let to_list_rev_map f (_, ctx) = List.rev_map f ctx
 
+  let to_list_map_i f i (_, ctx) = List.map_i f i ctx
+
   (** empty rel-context *)
   let empty = 0, []
 
@@ -321,7 +323,7 @@ struct
       Innermost declarations are processed first. *)
   let fold_inside f ~init (_, ctx) = List.fold_left f init ctx
 
-  let fold_inside_i f ~init (_, ctx) = List.fold_left_i 0 f init ctx
+  let fold_inside_i f i ~init (_, ctx) = List.fold_left_i f i init ctx
 
   (** Reduce all terms in a given rel-context to a single value.
       Outermost declarations are processed first. *)

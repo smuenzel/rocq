@@ -145,6 +145,8 @@ sig
   val to_list_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
   val to_list_rev_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
 
+  val to_list_map_i : (int -> ('c, 't, 'r) Declaration.pt -> 'a) -> int -> ('c, 't, 'r) pt -> 'a list
+
   (** empty rel-context *)
   val empty : ('c, 't, 'r) pt
 
@@ -228,7 +230,7 @@ sig
       Innermost declarations are processed first. *)
   val fold_inside : ('a -> ('c, 't, 'r) Declaration.pt -> 'a) -> init:'a -> ('c, 't, 'r) pt -> 'a
 
-  val fold_inside_i : (int -> 'a -> ('c, 't, 'r) Declaration.pt -> 'a) -> init:'a -> ('c, 't, 'r) pt -> 'a
+  val fold_inside_i : (int -> 'a -> ('c, 't, 'r) Declaration.pt -> 'a) -> int -> init:'a -> ('c, 't, 'r) pt -> 'a
 
   (** Reduce all terms in a given rel-context to a single value.
       Outermost declarations are processed first. *)
