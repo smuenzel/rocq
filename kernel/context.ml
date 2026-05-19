@@ -320,6 +320,8 @@ struct
 
   let for_all f (_, ctx) = List.for_all f ctx
 
+  let for_all_i f i (_, ctx) = List.for_all_i f i ctx
+
   let exists f (_, ctx) = List.exists f ctx
 
   (** Perform a given action on every declaration in a given rel-context. *)

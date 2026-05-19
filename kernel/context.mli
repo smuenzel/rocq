@@ -223,6 +223,9 @@ sig
   val for_all : (('c, 't, 'r) Declaration.pt -> bool) ->
     ('c, 't, 'r) pt -> bool
 
+  val for_all_i : (int -> ('c, 't, 'r) Declaration.pt -> bool) -> int ->
+    ('c, 't, 'r) pt -> bool
+
   (** Check whether any declaration satisfies a predicate. *)
   val exists : (('c, 't, 'r) Declaration.pt -> bool) ->
     ('c, 't, 'r) pt -> bool
