@@ -147,11 +147,15 @@ sig
 
   val to_list_map_i : (int -> ('c, 't, 'r) Declaration.pt -> 'a) -> int -> ('c, 't, 'r) pt -> 'a list
 
+  val uncons : ('c, 't, 'r) pt -> (('c, 't, 'r) Declaration.pt * ('c, 't, 'r) pt) option
+
   (** empty rel-context *)
   val empty : ('c, 't, 'r) pt
 
   (** Check whether a rel-context is empty *)
   val is_empty : ('c, 't, 'r) pt -> bool
+
+  val init : int -> (int -> ('c, 't, 'r) Declaration.pt) -> ('c, 't, 'r) pt
 
   (** Return a new rel-context enriched by with a given inner-most declaration. *)
   val add : ('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
@@ -203,6 +207,9 @@ sig
   val map_decl : (('c1, 't1, 'r1) Declaration.pt -> ('c2, 't2, 'r2) Declaration.pt) ->
     ('c1, 't1, 'r1) pt -> ('c2, 't2, 'r2) pt
 
+  val map_decl_i : (int -> ('c1, 't1, 'r1) Declaration.pt -> ('c2, 't2, 'r2) Declaration.pt) ->
+    int -> ('c1, 't1, 'r1) pt -> ('c2, 't2, 'r2) pt
+
   (** Like {!map_decl} but returns the original context unchanged if no
       declaration is modified (checked via physical equality). *)
   val map_decl_smart : (('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) Declaration.pt) ->
@@ -226,6 +233,8 @@ sig
   (** Perform an action on each declaration. *)
   val iter_decl : (('c, 't, 'r) Declaration.pt -> unit) -> ('c, 't, 'r) pt -> unit
 
+  val count : (('c, 't, 'r) Declaration.pt -> bool) -> ('c, 't, 'r) pt -> int
+
   (** Reduce all terms in a given rel-context to a single value.
       Innermost declarations are processed first. *)
   val fold_inside : ('a -> ('c, 't, 'r) Declaration.pt -> 'a) -> init:'a -> ('c, 't, 'r) pt -> 'a
@@ -235,6 +244,8 @@ sig
   (** Reduce all terms in a given rel-context to a single value.
       Outermost declarations are processed first. *)
   val fold_outside : (('c, 't, 'r) Declaration.pt -> 'a -> 'a) -> ('c, 't, 'r) pt -> init:'a -> 'a
+
+  val fold_outside_map : (('c, 't, 'r) Declaration.pt -> 'a -> ('c, 't, 'r) Declaration.pt * 'a) -> ('c, 't, 'r) pt -> init:'a -> ('c, 't, 'r) pt * 'a
 
   (** Return the set of all named variables bound in a given rel-context. *)
   val to_vars : ('c, 't, 'r) pt -> Id.Set.t

@@ -233,10 +233,16 @@ struct
 
   let to_list_map_i f i (_, ctx) = List.map_i f i ctx
 
+  let uncons (n, ctx) = match ctx with
+  | [] -> None
+  | decl :: ctx -> Some (decl, (n - 1, ctx))
+
   (** empty rel-context *)
   let empty = 0, []
 
   let is_empty (_, ctx) = List.is_empty ctx
+
+  let init n f = n, List.init n f
 
   (** Return a new rel-context enriched by with a given inner-most declaration. *)
   let add d (n, ctx) = n+1, d :: ctx
@@ -304,6 +310,8 @@ struct
 
   let map_decl f (n, ctx) = n, List.map f ctx
 
+  let map_decl_i f i (n, ctx) = n, List.map_i f i ctx
+
   let map_decl_smart f ((n, ctx) as rctx) =
     let result = List.Smart.map f ctx in
     if result == ctx then rctx else n, result
@@ -319,6 +327,8 @@ struct
 
   let iter_decl f (_, ctx) = List.iter f ctx
 
+  let count f (_, ctx) = List.count f ctx
+
   (** Reduce all terms in a given rel-context to a single value.
       Innermost declarations are processed first. *)
   let fold_inside f ~init (_, ctx) = List.fold_left f init ctx
@@ -328,6 +338,10 @@ struct
   (** Reduce all terms in a given rel-context to a single value.
       Outermost declarations are processed first. *)
   let fold_outside f (_, l) ~init = List.fold_right f l init
+
+  let fold_outside_map f (n, l) ~init =
+    let l, result = List.fold_right_map f l init in
+    (n, l), result
 
   (** Return the set of all named variables bound in a given rel-context. *)
   let to_vars (_, l) =

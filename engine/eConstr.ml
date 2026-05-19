@@ -629,8 +629,7 @@ let expand_branch env _sigma u pms (ind, i) (nas, _br) =
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let paramsubst = Vars.subst_of_rel_context_instance paramdecl pms in
   let (ctx, _) = mip.mind_nf_lc.(i - 1) in
-  let (ctx, _) = List.chop mip.mind_consnrealdecls.(i - 1) (Context.Rel.to_list ctx) in
-  let ctx = Context.Rel.of_list ctx in
+  let (ctx, _) = Context.Rel.chop mip.mind_consnrealdecls.(i - 1) ctx in
   let nas =
     let gen : type a b. (a,b) eq -> (_,a) Context.pbinder_annot array ->
       (_,b) Context.pbinder_annot array =
@@ -1197,13 +1196,14 @@ let lookup_named n e = cast_named_decl (sym unsafe_eq) (sym unsafe_relevance_eq)
 let lookup_named_val n e = cast_named_decl (sym unsafe_eq) (sym unsafe_relevance_eq) (lookup_named_ctxt n e)
 
 let map_rel_context_in_env f env sign =
-  let rec aux env acc = function
-    | d::sign ->
-        aux (push_rel d env) (Context.Rel.Declaration.map_constr (f env) d :: acc) sign
-    | [] ->
+  let rec aux env acc ctx =
+    match Context.Rel.uncons ctx with
+    | Some (d, sign) ->
+        aux (push_rel d env) Context.Rel.(add (Declaration.map_constr (f env) d) acc) sign
+    | None ->
         acc
   in
-  Context.Rel.of_list (aux env [] (List.rev (Context.Rel.to_list sign)))
+  aux env Context.Rel.empty (Context.Rel.rev sign)
 
 let match_named_context_val :
   named_context_val -> (named_declaration * named_context_val) option =
