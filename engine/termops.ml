@@ -1168,13 +1168,14 @@ let assums_of_rel_context sign =
     sign ~init:[]
 
 let map_rel_context_in_env f env sign =
-  let rec aux env acc = function
-    | d::sign ->
-        aux (push_rel d env) (RelDecl.map_constr (f env) d :: acc) sign
-    | [] ->
+  let rec aux env acc sign =
+    match Context.Rel.uncons sign with
+    | Some (d, sign) ->
+        aux (push_rel d env) (Context.Rel.add (RelDecl.map_constr (f env) d) acc) sign
+    | None ->
         acc
   in
-  Context.Rel.of_list (aux env [] (List.rev (Context.Rel.to_list sign)))
+  aux env Context.Rel.empty (Context.Rel.rev sign)
 
 let fold_named_context_both_sides f l ~init = List.fold_right_and_left f l init
 
@@ -1272,10 +1273,10 @@ let prod_applist_decls sigma n c l =
 (* Do not skip let-in's *)
 let env_rel_context_chop k env =
   let open EConstr in
-  let rels = Context.Rel.to_list (rel_context env) in
-  let ctx1,ctx2 = List.chop k rels in
-  push_rel_context (Context.Rel.of_list ctx2) (reset_with_named_context (named_context_val env) env),
-  Context.Rel.of_list ctx1
+  let rels = rel_context env in
+  let ctx1,ctx2 = Context.Rel.chop k rels in
+  push_rel_context ctx2 (reset_with_named_context (named_context_val env) env),
+  ctx1
 
 (** Terms as a datatype *)
 

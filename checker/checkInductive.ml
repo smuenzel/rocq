@@ -59,19 +59,20 @@ let to_entry mind (mb:mutual_inductive_body) : Entries.mutual_inductive_entry =
     | None -> mb.mind_params_ctxt
     | Some template ->
       let open Context.Rel.Declaration in
-      let rec fix_params acc params template = match params, template with
-        | [], [] -> acc
-        | (LocalDef _ as d) :: params , _ ->
-          fix_params (d::acc) params template
-        | (LocalAssum _ as d) :: params, None :: template ->
-          fix_params (d :: acc) params template
-        | LocalAssum (na, t) :: params, Some s :: template ->
+      let rec fix_params acc params template = match Context.Rel.uncons params, template with
+        | None, [] -> acc
+        | Some ((LocalDef _ as d), params) , _ ->
+          fix_params Context.Rel.(add d acc) params template
+        | Some ((LocalAssum _ as d), params), None :: template ->
+          fix_params Context.Rel.(add d  acc) params template
+        | Some (LocalAssum (na, t), params), Some s :: template ->
           let ctx, _ = Term.destArity t in
           let d = LocalAssum (na, Term.mkArity (ctx, s)) in
-          fix_params (d :: acc) params template
-        | _ :: _, [] | [], _ :: _ -> assert false
+          fix_params Context.Rel.(add d acc) params template
+        | Some _, [] | None, _ :: _ -> assert false
       in
-      Context.Rel.of_list (fix_params [] (Context.Rel.to_list (Context.Rel.rev mb.mind_params_ctxt)) template.template_param_arguments)
+      fix_params Context.Rel.empty
+        (Context.Rel.rev mb.mind_params_ctxt) template.template_param_arguments
   in
   let mind_entry_inds = Array.map_to_list (fun ind ->
       let mind_entry_arity =

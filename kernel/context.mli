@@ -172,6 +172,8 @@ sig
   (** Skip the first [n] (innermost) declarations. *)
   val skipn : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
 
+  val sep_last : ('c, 't, 'r) pt -> ('c, 't, 'r) Declaration.pt * ('c, 't, 'r) pt
+
   val nth : ('c, 't, 'r) pt -> int -> ('c, 't, 'r) Declaration.pt
 
   (** Return the number of {e local declarations} in a given rel-context. *)

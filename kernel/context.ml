@@ -255,6 +255,9 @@ struct
 
   let skipn n (n', ctx) = n'-n, List.skipn n ctx
 
+  let sep_last (n, ctx) = let d, ctx' = List.sep_last ctx in
+    d, (n - 1, ctx')
+
   let nth (_, ctx) n = List.nth ctx n
 
   (** Return the number of {e local declarations} in a given rel-context. *)
