@@ -493,19 +493,19 @@ let rec subst_constr (subst,usubst as e) c =
 
 let subst_context e ctx =
   let open Context.Rel.Declaration in
-  let rec subst_context ctx = match ctx with
-  | [] -> e, []
-  | LocalAssum (na, ty) :: ctx ->
+  let rec subst_context ctx = match Context.Rel.uncons ctx with
+  | None -> e, Context.Rel.empty
+  | Some (LocalAssum (na, ty), ctx) ->
     let e, ctx = subst_context ctx in
     let ty = subst_constr e ty in
-    usubs_lift e, LocalAssum (na, ty) :: ctx
-  | LocalDef (na, ty, bdy) :: ctx ->
+    usubs_lift e, Context.Rel.add (LocalAssum (na, ty)) ctx
+  | Some (LocalDef (na, ty, bdy), ctx) ->
     let e, ctx = subst_context ctx in
     let ty = subst_constr e ty in
     let bdy = subst_constr e bdy in
-    usubs_lift e, LocalDef (na, ty, bdy) :: ctx
+    usubs_lift e, Context.Rel.add (LocalDef (na, ty, bdy)) ctx
   in
-  Context.Rel.of_list (snd @@ subst_context (Context.Rel.to_list ctx))
+  snd @@ subst_context ctx
 
 (** The inverse of mk_clos: move back to constr
     Assuming [Γ ⊢ lfts : Δ] and [Δ ⊢ v],
@@ -656,14 +656,15 @@ let subst_context env ctx =
 let it_mkLambda_or_LetIn infos ctx t =
   let l = Range.length (info_relevances infos) in
   let open Context.Rel.Declaration in
-  let rctx = Context.Rel.to_list (Context.Rel.rev ctx) in
-  match rctx with
-  | [] -> t
-  | LocalAssum (n, ty) :: rctx ->
-      let assums, rctx = List.map_until (function LocalAssum (n, ty) -> Some (n, ty) | LocalDef _ -> None) rctx in
+  let rctx = Context.Rel.rev ctx in
+  match Context.Rel.uncons rctx with
+  | None -> t
+  | Some (LocalAssum (n, ty), rctx) ->
+      let assums, rctx = Context.Rel.to_list_until (function LocalAssum (n, ty) -> Some (n, ty) | LocalDef _ -> None) rctx in
       let assums = (n, ty) :: assums in
-      { term = FLambda(List.length assums, assums, Term.it_mkLambda_or_LetIn (term_of_fconstr t) (Context.Rel.of_list (List.rev rctx)), (subs_id l, UVars.Instance.empty)); mark = t.mark }
-  | LocalDef _ :: _ ->
+      { term = FLambda(Context.Rel.length assums, assums,
+                       Term.it_mkLambda_or_LetIn (term_of_fconstr t) (Context.Rel.rev rctx), (subs_id l, UVars.Instance.empty)); mark = t.mark }
+  | Some (LocalDef _, _) ->
       mk_clos (subs_id l, UVars.Instance.empty) (Term.it_mkLambda_or_LetIn (term_of_fconstr t) ctx)
 
 (* fstrong applies unfreeze_fun recursively on the (freeze) term and

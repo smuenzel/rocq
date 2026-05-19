@@ -233,6 +233,10 @@ struct
 
   let to_list_map_i f i (_, ctx) = List.map_i f i ctx
 
+  let to_list_until f (_, ctx) =
+    let a, ctx = List.map_until f ctx in
+    a, of_list ctx
+
   let uncons (n, ctx) = match ctx with
   | [] -> None
   | decl :: ctx -> Some (decl, (n - 1, ctx))
@@ -318,6 +322,7 @@ struct
   let map_decl_smart f ((n, ctx) as rctx) =
     let result = List.Smart.map f ctx in
     if result == ctx then rctx else n, result
+
 
   let filter f (_, ctx) = List.filter f ctx |> of_list
 

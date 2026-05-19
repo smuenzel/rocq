@@ -144,6 +144,8 @@ sig
 
   val to_list_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
   val to_list_rev_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
+  val to_list_until : (('c, 't, 'r) Declaration.pt -> 'a option) ->
+    ('c, 't, 'r) pt -> 'a list * ('c, 't, 'r) pt
 
   val to_list_map_i : (int -> ('c, 't, 'r) Declaration.pt -> 'a) -> int -> ('c, 't, 'r) pt -> 'a list
 
