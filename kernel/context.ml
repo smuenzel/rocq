@@ -228,6 +228,9 @@ struct
   let to_list (_, ctx) = ctx
   let of_list ctx = List.length ctx, ctx
 
+  let to_list_map f (_, ctx) = List.map f ctx
+  let to_list_rev_map f (_, ctx) = List.rev_map f ctx
+
   (** empty rel-context *)
   let empty = 0, []
 
@@ -243,6 +246,8 @@ struct
   let firstn n (n',ctx) = min n n', List.firstn n ctx
 
   let skipn n (n', ctx) = n'-n, List.skipn n ctx
+
+  let nth (_, ctx) n = List.nth ctx n
 
   (** Return the number of {e local declarations} in a given rel-context. *)
   let length (n,_) = n
@@ -275,6 +280,10 @@ struct
 
   let map_with_relevance g f ((n, ctx) as rctx) = 
     let result = List.Smart.map (Declaration.map_constr_with_relevance g f) ctx in
+    if result == ctx then rctx else n, result
+
+  let map_relevance f ((n, ctx) as rctx) =
+    let result = List.Smart.map (Declaration.map_relevance f) ctx in
     if result == ctx then rctx else n, result
 
   let map_het fr f (n, ctx) = n, List.map (Declaration.map_constr_het fr f) ctx
@@ -312,6 +321,8 @@ struct
       Innermost declarations are processed first. *)
   let fold_inside f ~init (_, ctx) = List.fold_left f init ctx
 
+  let fold_inside_i f ~init (_, ctx) = List.fold_left_i 0 f init ctx
+
   (** Reduce all terms in a given rel-context to a single value.
       Outermost declarations are processed first. *)
   let fold_outside f (_, l) ~init = List.fold_right f l init
@@ -334,6 +345,10 @@ struct
     in aux [] l
 
   let drop_bodies l = map_decl_smart Declaration.drop_body l
+
+  let chop n (n', l) =
+    let l1, l2 = List.chop n l in
+    (n, l1), (n' - n, l2)
 
   (** Split a context so that the second part contains [n]
       [LocalAssum], keeping all [LocalDef] in the middle in the first part *)

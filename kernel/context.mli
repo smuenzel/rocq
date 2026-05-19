@@ -142,6 +142,9 @@ sig
   val to_list : ('c, 't, 'r) pt -> ('c, 't, 'r) Declaration.pt list
   val of_list : ('c, 't, 'r) Declaration.pt list -> ('c, 't, 'r) pt
 
+  val to_list_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
+  val to_list_rev_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
+
   (** empty rel-context *)
   val empty : ('c, 't, 'r) pt
 
@@ -163,6 +166,8 @@ sig
   (** Skip the first [n] (innermost) declarations. *)
   val skipn : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
 
+  val nth : ('c, 't, 'r) pt -> int -> ('c, 't, 'r) Declaration.pt
+
   (** Return the number of {e local declarations} in a given rel-context. *)
   val length : ('c, 't, 'r) pt -> int
 
@@ -182,6 +187,8 @@ sig
 
   (** Map all terms in a given rel-context. *)
   val map_with_relevance : ('r -> 'r) -> ('c -> 'c) -> ('c, 'c, 'r) pt -> ('c, 'c, 'r) pt
+
+  val map_relevance : ('r -> 'r) -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
 
   (** Map all terms in a given named-context. *)
   val map_het : ('r1 -> 'r2) -> ('c -> 'd) -> ('c, 'c, 'r1) pt -> ('d, 'd, 'r2) pt
@@ -221,6 +228,8 @@ sig
       Innermost declarations are processed first. *)
   val fold_inside : ('a -> ('c, 't, 'r) Declaration.pt -> 'a) -> init:'a -> ('c, 't, 'r) pt -> 'a
 
+  val fold_inside_i : (int -> 'a -> ('c, 't, 'r) Declaration.pt -> 'a) -> init:'a -> ('c, 't, 'r) pt -> 'a
+
   (** Reduce all terms in a given rel-context to a single value.
       Outermost declarations are processed first. *)
   val fold_outside : (('c, 't, 'r) Declaration.pt -> 'a -> 'a) -> ('c, 't, 'r) pt -> init:'a -> 'a
@@ -236,6 +245,8 @@ sig
 
   (** Turn all [LocalDef] into [LocalAssum], leave [LocalAssum] unchanged. *)
   val drop_bodies : ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  val chop : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt * ('c, 't, 'r) pt
 
   (** [chop_nhyps n Γ] returns [Γ'',Γ'] such that [Γ]=[Γ'Γ''], [Γ''] has
       [n] hypotheses (i.e. [LocalAssum]), excluding local definitions
