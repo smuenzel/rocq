@@ -315,15 +315,15 @@ let instantiate_context u subst nas ctx =
     { binder_name = nas.(i).binder_name;
       binder_relevance = UVars.subst_instance_relevance u na.binder_relevance }
   in
-  let rec instantiate i ctx = match Context.Rel.to_list ctx with
-  | [] -> assert (Int.equal i (-1)); Context.Rel.empty
-  | LocalAssum (na, ty) :: ctx ->
-    let ctx = instantiate (pred i) (Context.Rel.of_list ctx) in
+  let rec instantiate i ctx = match Context.Rel.uncons ctx with
+  | None -> assert (Int.equal i (-1)); Context.Rel.empty
+  | Some (LocalAssum (na, ty),  ctx) ->
+    let ctx = instantiate (pred i) ctx in
     let ty = substnl subst i (subst_instance_constr u ty) in
     let na = get_binder i na in
     Context.Rel.add (LocalAssum (na, ty)) ctx
-  | LocalDef (na, ty, bdy) :: ctx ->
-    let ctx = instantiate (pred i) (Context.Rel.of_list ctx) in
+  | Some (LocalDef (na, ty, bdy), ctx) ->
+    let ctx = instantiate (pred i) ctx in
     let ty = substnl subst i (subst_instance_constr u ty) in
     let bdy = substnl subst i (subst_instance_constr u bdy) in
     let na = get_binder i na in
@@ -335,22 +335,22 @@ let expand_arity (mib, mip) (ind, u) params nas =
   let open Context.Rel.Declaration in
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let params = Vars.subst_of_rel_context_instance paramdecl params in
-  let realdecls, _ = List.chop mip.mind_nrealdecls (Context.Rel.to_list mip.mind_arity_ctxt) in
+  let realdecls, _ = Context.Rel.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
   let self =
     let u = UVars.Instance.abstract_instance (UVars.Instance.length u) in
     let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
     mkApp (mkIndU (ind, u), args)
   in
   let na = Context.make_annot Anonymous mip.mind_relevance in
-  let realdecls = LocalAssum (na, self) :: realdecls in
-  instantiate_context u params nas (Context.Rel.of_list realdecls)
+  let realdecls = Context.Rel.add (LocalAssum (na, self)) realdecls in
+  instantiate_context u params nas realdecls
 
 let expand_branch_contexts (mib, mip) u params br =
   let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
   let paramsubst = Vars.subst_of_rel_context_instance paramdecl params in
   let build_one_branch i (nas, _) (ctx, _) =
-    let ctx, _ = List.chop mip.mind_consnrealdecls.(i) (Context.Rel.to_list ctx) in
-    let ctx = instantiate_context u paramsubst nas (Context.Rel.of_list ctx) in
+    let ctx, _ = Context.Rel.chop mip.mind_consnrealdecls.(i) ctx in
+    let ctx = instantiate_context u paramsubst nas ctx in
     ctx
   in
   Array.map2_i build_one_branch br mip.mind_nf_lc

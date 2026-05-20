@@ -465,13 +465,13 @@ let interp_props ~program_mode env' cty k ctx ctx' subst sigma = function
     check_duplicate ?loc fs;
     let subst, sigma = do_instance_type_ctx_instance fs k env' ctx' sigma ~program_mode subst in
     let term, termtype =
-      do_instance_subst_constructor_and_ty subst k (Context.Rel.of_list (Context.Rel.to_list ctx' @ ctx)) in
+      do_instance_subst_constructor_and_ty subst k (Context.Rel.append ctx' ctx) in
     term, termtype, sigma
   | (_, term) ->
     let sigma, def =
       interp_casted_constr_evars ~program_mode env' sigma term cty in
-    let termtype = it_mkProd_or_LetIn cty (Context.Rel.of_list ctx) in
-    let term = it_mkLambda_or_LetIn def (Context.Rel.of_list ctx) in
+    let termtype = it_mkProd_or_LetIn cty ctx in
+    let term = it_mkLambda_or_LetIn def ctx in
     term, termtype, sigma
 
 let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx ctx' pri decl imps subst id opt_props =
@@ -483,17 +483,17 @@ let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx 
       let term, termtype =
         if k.clu_trivial then
           let term, termtype =
-            do_instance_subst_constructor_and_ty subst k (Context.Rel.of_list (Context.Rel.to_list ctx' @ ctx)) in
+            do_instance_subst_constructor_and_ty subst k (Context.Rel.append ctx' ctx) in
           Some term, termtype
         else
-          None, it_mkProd_or_LetIn cty (Context.Rel.of_list ctx)
+          None, it_mkProd_or_LetIn cty ctx
       in
       let termtype, sigma = do_instance_resolve_TC ~poly termtype sigma env in
       term, termtype, sigma
   in
   Flags.silently (fun () ->
       declare_instance_open sigma ?hook ~tac ~locality ~poly
-        id pri imps decl (List.map RelDecl.get_name ctx) term termtype)
+        id pri imps decl (Context.Rel.to_list_map RelDecl.get_name ctx) term termtype)
     ()
 
 let do_instance env env' sigma ?hook ~locality ~poly cty k ctx ctx' pri decl imps subst id props =
@@ -513,7 +513,7 @@ let do_instance_program ~pm env env' sigma ?hook ~locality ~poly cty k ctx ctx' 
       let subst, sigma =
         do_instance_type_ctx_instance [] k env' ctx' sigma ~program_mode:true subst in
       let term, termtype =
-        do_instance_subst_constructor_and_ty subst k (Context.Rel.of_list (Context.Rel.to_list ctx' @ ctx)) in
+        do_instance_subst_constructor_and_ty subst k (Context.Rel.append ctx' ctx) in
       term, termtype, sigma in
   let termtype, sigma = do_instance_resolve_TC ~poly termtype sigma env in
   if not (Evd.has_undefined sigma) && not (Option.is_empty opt_props) then
@@ -595,7 +595,7 @@ let new_instance_interactive ~locality ~poly instid ctx cl
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     new_instance_common ~program_mode:false ~poly env instid ctx cl in
   id, do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly
-    cty k (Context.Rel.to_list ctx) ctx' pri decl imps subst id opt_props
+    cty k ctx ctx' pri decl imps subst id opt_props
 
 let new_instance_program ~locality ~pm ~poly instid ctx cl opt_props ?hook pri =
   let env = Global.env() in
@@ -603,7 +603,7 @@ let new_instance_program ~locality ~pm ~poly instid ctx cl opt_props ?hook pri =
     new_instance_common ~program_mode:true ~poly env instid ctx cl in
   let pm =
     do_instance_program ~pm env env' sigma ?hook ~locality ~poly
-      cty k (Context.Rel.to_list ctx) ctx' pri decl imps subst id opt_props in
+      cty k ctx ctx' pri decl imps subst id opt_props in
   pm, id
 
 let new_instance ~locality ~poly instid ctx cl props ?hook pri =
@@ -611,7 +611,7 @@ let new_instance ~locality ~poly instid ctx cl props ?hook pri =
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     new_instance_common ~program_mode:false ~poly env instid ctx cl in
   do_instance env env' sigma ?hook ~locality ~poly
-    cty k (Context.Rel.to_list ctx) ctx' pri decl imps subst id props;
+    cty k ctx ctx' pri decl imps subst id props;
   id
 
 let declare_new_instance ~locality ~program_mode ~poly instid ctx cl pri =
