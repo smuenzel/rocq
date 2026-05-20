@@ -1166,13 +1166,13 @@ let destArity sigma =
   let open Context.Rel.Declaration in
   let rec prodec_rec l c =
     match kind sigma c with
-    | Prod (x,t,c)    -> prodec_rec (LocalAssum (x,t) :: l) c
-    | LetIn (x,b,t,c) -> prodec_rec (LocalDef (x,b,t) :: l) c
+    | Prod (x,t,c)    -> prodec_rec (Context.Rel.add (LocalAssum (x,t)) l) c
+    | LetIn (x,b,t,c) -> prodec_rec (Context.Rel.add (LocalDef (x,b,t)) l) c
     | Cast (c,_,_)      -> prodec_rec l c
-    | Sort s          -> Context.Rel.of_list l, s
+    | Sort s          -> l, s
     | _               -> anomaly ~label:"destArity" (Pp.str "not an arity.")
   in
-  prodec_rec []
+  prodec_rec Context.Rel.empty
 
 let push_rel d e = push_rel (cast_rel_decl unsafe_eq unsafe_relevance_eq d) e
 let push_rel_context d e = push_rel_context (cast_rel_context unsafe_eq unsafe_relevance_eq d) e

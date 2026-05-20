@@ -2866,43 +2866,43 @@ let specialize_eqs id =
      | sigma -> evars := sigma; true
      | exception Evarconv.UnableToUnify _ -> false)
   in
-  let rec aux in_eqs ctx acc ty =
+  let rec aux in_eqs (ctx : rel_context) acc ty =
     match EConstr.kind !evars ty with
     | Prod (na, t, b) ->
         (match EConstr.kind !evars t with
         | App (eq, [| eqty; x; y |]) when is_lib_ref env !evars "core.eq.type" eq ->
-            let c = if noccur_between !evars 1 (List.length ctx) x then y else x in
+            let c = if noccur_between !evars 1 (Context.Rel.length ctx) x then y else x in
             let pt = mkApp (eq, [| eqty; c; c |]) in
             let ind = destInd !evars eq in
             let p = mkApp (mkConstructUi (ind,0), [| eqty; c |]) in
-              if unif (push_rel_context (Context.Rel.of_list ctx) env) evars pt t then
+              if unif (push_rel_context ctx env) evars pt t then
                 aux true ctx (mkApp (acc, [| p |])) (subst1 p b)
               else acc, in_eqs, ctx, ty
         | App (heq, [| eqty; x; eqty'; y |]) when isRefX env !evars (Lazy.force rocq_heq_ref) heq ->
-            let eqt, c = if noccur_between !evars 1 (List.length ctx) x then eqty', y else eqty, x in
+            let eqt, c = if noccur_between !evars 1 (Context.Rel.length ctx) x then eqty', y else eqty, x in
             let pt = mkApp (heq, [| eqt; c; eqt; c |]) in
             let ind = destInd !evars heq in
             let p = mkApp (mkConstructUi (ind,0), [| eqt; c |]) in
-              if unif (push_rel_context (Context.Rel.of_list ctx) env) evars pt t then
+              if unif (push_rel_context ctx env) evars pt t then
                 aux true ctx (mkApp (acc, [| p |])) (subst1 p b)
               else acc, in_eqs, ctx, ty
         | _ ->
             if in_eqs then acc, in_eqs, ctx, ty
             else
               let typeclass_candidate = Typeclasses.is_maybe_class_type env !evars t in
-              let sigma, e = Evarutil.new_evar ~typeclass_candidate (push_rel_context (Context.Rel.of_list ctx) env) !evars t in
+              let sigma, e = Evarutil.new_evar ~typeclass_candidate (push_rel_context ctx env) !evars t in
               evars := sigma;
-                aux false (LocalDef (na,e,t) :: ctx) (mkApp (lift 1 acc, [| mkRel 1 |])) b)
+                aux false (Context.Rel.add (LocalDef (na,e,t)) ctx) (mkApp (lift 1 acc, [| mkRel 1 |])) b)
     | t -> acc, in_eqs, ctx, ty
   in
-  let acc, worked, ctx, ty = aux false [] (mkVar id) ty in
-  let ctx' = Context.Rel.to_list (nf_rel_context_evar !evars (Context.Rel.of_list ctx)) in
-  let ctx'' = List.map (function
+  let acc, worked, ctx, ty = aux false Context.Rel.empty (mkVar id) ty in
+  let ctx = nf_rel_context_evar !evars ctx in
+  let ctx = Context.Rel.map_decl_smart (function
     | LocalDef (n,k,t) when isEvar !evars k -> LocalAssum (n,t)
-    | decl -> decl) ctx'
+    | decl -> decl) ctx
   in
-  let ty' = it_mkProd_or_LetIn ty (Context.Rel.of_list ctx'') in
-  let acc' = it_mkLambda_or_LetIn acc (Context.Rel.of_list ctx'') in
+  let ty' = it_mkProd_or_LetIn ty ctx in
+  let acc' = it_mkLambda_or_LetIn acc ctx in
   let ty' = Tacred.whd_simpl env !evars ty'
   and acc' = Tacred.whd_simpl env !evars acc' in
   let ty' = Evarutil.nf_evar !evars ty' in

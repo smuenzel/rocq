@@ -661,7 +661,7 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
   (* evar-normalize *)
   let arities = List.map EConstr.(to_constr sigma) arities in
   let constructors = List.map (on_snd (List.map (EConstr.to_constr sigma))) constructors in
-  let ctx_params = List.map (fun d -> EConstr.to_rel_decl sigma d) (Context.Rel.to_list ctx_params) in
+  let ctx_params = Context.Rel.map_decl (EConstr.to_rel_decl sigma) ctx_params in
 
   (* Build the inductive entries *)
   let entries = List.map3 (fun indname arity (cnames,ctypes) ->
@@ -675,7 +675,7 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
   let variance = variance_of_entry ~cumulative:(PolyFlags.cumulative poly) ~variances univ_entry in
   (* Build the mutual inductive entry *)
   let mind_ent =
-    { mind_entry_params = Context.Rel.of_list ctx_params;
+    { mind_entry_params = ctx_params;
       mind_entry_record = None;
       mind_entry_finite = finite;
       mind_entry_inds = entries;
@@ -801,7 +801,7 @@ let interp_mutual_inductive_gen env0 ~flags udecl (uparamsl,paramsl,indl) notati
       (cnames,List.map generalize_constructor ctypes))
       constructors
   in
-  let ctx_params = Context.Rel.to_list ctx_params @ Context.Rel.to_list ctx_uparams in
+  let ctx_params = Context.Rel.append ctx_params ctx_uparams in
   let userimpls = useruimpls @ userimpls in
   let indimpls = List.map (fun iimpl -> useruimpls @ iimpl) indimpls in
   let fullarities = List.map (fun c -> EConstr.it_mkProd_or_LetIn c ctx_uparams) fullarities in
@@ -815,7 +815,7 @@ let interp_mutual_inductive_gen env0 ~flags udecl (uparamsl,paramsl,indl) notati
       indimpls cimpls
   in
   let arities_explicit = List.map (fun ar -> ar.ind_arity_explicit) indl in
-  let default_dep_elim, mie, binders, ctx = interp_mutual_inductive_constr ~flags ~sigma ~ctx_params:(Context.Rel.of_list ctx_params) ~udecl ~variances ~arities_explicit ~arities ~template_syntax ~constructors ~env_ar ~private_ind ~indnames in
+  let default_dep_elim, mie, binders, ctx = interp_mutual_inductive_constr ~flags ~sigma ~ctx_params ~udecl ~variances ~arities_explicit ~arities ~template_syntax ~constructors ~env_ar ~private_ind ~indnames in
   (default_dep_elim, mie, binders, impls, ctx)
 
 

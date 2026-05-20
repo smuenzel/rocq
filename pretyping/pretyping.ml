@@ -1333,20 +1333,21 @@ struct
     let fsign, record =
       match Environ.get_projections !!env ind with
       | None ->
-         Context.Rel.of_list (List.map2 set_name (List.rev nal) (Context.Rel.to_list cs.cs_args)), false
+         Context.Rel.map_decl2 set_name (List.rev nal) cs.cs_args, false
       | Some ps ->
-        let rec aux n k names l =
-          match names, l with
-          | na :: names, (LocalAssum (na', t) :: l) ->
+        let rec aux n k names cs_args =
+          match names, Context.Rel.uncons cs_args with
+          | na :: names, Some (LocalAssum (na', t), cs_args) ->
             let proj = Projection.make (fst ps.(cs.cs_nargs - k)) true in
-            LocalDef ({na' with binder_name = na},
-                      lift (cs.cs_nargs - n) (mkProj (proj, na'.binder_relevance, cj.uj_val)), t)
-            :: aux (n+1) (k + 1) names l
-          | na :: names, (decl :: l) ->
-            set_name na decl :: aux (n+1) k names l
-          | [], [] -> []
+            Context.Rel.add
+              (LocalDef ({na' with binder_name = na},
+                        lift (cs.cs_nargs - n) (mkProj (proj, na'.binder_relevance, cj.uj_val)), t))
+              (aux (n+1) (k + 1) names cs_args)
+          | na :: names, Some (decl, cs_args) ->
+            Context.Rel.add (set_name na decl) (aux (n+1) k names cs_args)
+          | [], None -> Context.Rel.empty
           | _ -> assert false
-        in Context.Rel.of_list (aux 1 1 (List.rev nal) (Context.Rel.to_list cs.cs_args)), true in
+        in aux 1 1 (List.rev nal) cs.cs_args, true in
     let fsign = Context.Rel.map (whd_betaiota !!env sigma) fsign in
     let hypnaming = VarSet.variables (Global.env ()) in
     let fsign,env_f = push_rel_context ~hypnaming sigma fsign env in

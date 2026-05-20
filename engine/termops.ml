@@ -456,12 +456,11 @@ let it_mkNamedProd_wo_LetIn init = it_named_context_quantifier mkNamedProd_wo_Le
 
 let it_mkLambda_or_LetIn_from_no_LetIn c decls =
   let open RelDecl in
-  let rec aux k decls c = match decls with
-  | [] -> c
-  | LocalDef (na,b,t) :: decls -> mkLetIn (na,b,t,aux (k-1) decls (liftn 1 k c))
-  | LocalAssum (na,t) :: decls -> mkLambda (na,t,aux (k-1) decls c)
-  in let decls' = Context.Rel.to_list decls in
-  aux (List.length decls') (List.rev decls') c
+  let rec aux k decls c = match Context.Rel.uncons decls with
+  | None -> c
+  | Some (LocalDef (na,b,t), decls) -> mkLetIn (na,b,t,aux (k-1) decls (liftn 1 k c))
+  | Some (LocalAssum (na,t), decls) -> mkLambda (na,t,aux (k-1) decls c)
+  in aux (Context.Rel.length decls) (Context.Rel.rev decls) c
 
 (* strips head casts and flattens head applications *)
 let rec strip_head_cast sigma c = match EConstr.kind sigma c with

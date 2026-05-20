@@ -1055,7 +1055,7 @@ let abstract_predicate env sigma indf cur realargs (names,na) tms ccl =
   in
   let pred = extract_predicate ccl tms in
   (* Build the predicate properly speaking *)
-  let sign = Context.Rel.of_list (List.map2 set_name (na::names) (Context.Rel.to_list sign)) in
+  let sign = Context.Rel.map_decl2 set_name (na::names) sign in
   it_mkLambda_or_LetIn_name !!env sigma pred sign
 
 (* [expand_arg] is used by [specialize_predicate]
@@ -2241,8 +2241,11 @@ let hole na = DAst.make @@
       Evar_kinds.qm_record_field=None})
 
 let constr_of_pat env sigma arsign pat avoid =
-  let arsign = Context.Rel.to_list arsign in
-  let rec typ env sigma decl realdecls pat avoid =
+  let decl, realdecls = match Context.Rel.uncons arsign with
+    | Some (d, r) -> d, r
+    | None -> assert false
+  in
+  let rec typ env sigma decl (realdecls : rel_context) pat avoid =
     let loc = pat.CAst.loc in
     let ty = RelDecl.get_type decl in
     match DAst.get pat with
@@ -2253,13 +2256,13 @@ let constr_of_pat env sigma arsign pat avoid =
               let id = next_ident_away wildcard_id avoid in
                 Name id, Id.Set.add id avoid
         in
-        let realargs = List.map (map_name (fun _ -> Anonymous)) realdecls in (* Hack to force their instantiation as evars *)
-          (sigma, (DAst.make ?loc @@ PatVar name), Context.Rel.of_list ([Rel.Declaration.set_name name decl] @ realargs), mkRel 1, lift 1 ty,
-           List.rev (rel_list 1 (List.length realargs)), 1, avoid)
+        let realdecls = Context.Rel.map_decl (map_name (fun _ -> Anonymous)) realdecls in (* Hack to force their instantiation as evars *)
+          (sigma, (DAst.make ?loc @@ PatVar name), Context.Rel.add (Rel.Declaration.set_name name decl) realdecls, mkRel 1, lift 1 ty,
+           List.rev (rel_list 1 (Context.Rel.length realdecls)), 1, avoid)
     | PatCstr (((_, i) as cstr),patargs,alias) ->
         let cind = inductive_of_constructor cstr in
         let IndType (indf, _) =
-          try find_rectype env sigma (lift (-(List.length realdecls)) ty)
+          try find_rectype env sigma (lift (-(Context.Rel.length realdecls)) ty)
           with Not_found -> error_case_not_inductive env sigma
             {uj_val = ty; uj_type = Retyping.get_type_of env sigma ty}
         in
@@ -2274,7 +2277,7 @@ let constr_of_pat env sigma arsign pat avoid =
             (fun decl pat (sigma, patargs, args, pats_c, sign, env, n, m, avoid)  ->
                let sigma, patarg', sign', pat_c', typ', argtypargs, n', avoid =
                  let decl = Rel.Declaration.map_constr (fun c -> substl pats_c (liftn (Context.Rel.length sign) (succ (List.length pats_c)) c)) decl in
-                   typ env sigma decl [] pat avoid
+                   typ env sigma decl Context.Rel.empty pat avoid
                in
                let args = match decl with
                  | LocalAssum _ -> pat_c' :: List.map (lift n') args
@@ -2292,7 +2295,7 @@ let constr_of_pat env sigma arsign pat avoid =
         let app = applist (app, args) in
         let apptype = Retyping.get_type_of env sigma app in
         let IndType (indf, realargs) as ind = find_rectype env sigma apptype in
-        let subst = Vars.subst_of_rel_context_instance_list (Context.Rel.of_list realdecls) realargs in
+        let subst = Vars.subst_of_rel_context_instance_list realdecls realargs in
         let apptype = mkAppliedInd ind (* this absorbs trailing let-ins *) in
           match alias with
               Anonymous ->
@@ -2318,7 +2321,7 @@ let constr_of_pat env sigma arsign pat avoid =
                   (* Mark the equality as a hole *)
                   sigma, pat', sign, lift i app, lift i apptype, subst, n + i, avoid
   in
-  let sigma, pat', sign, patc, patty, args, z, avoid = typ env sigma (List.hd arsign) (List.tl arsign) pat avoid in
+  let sigma, pat', sign, patc, patty, args, z, avoid = typ env sigma decl realdecls pat avoid in
     sigma, pat', (sign, patc, (patty, args), pat'), avoid
 
 

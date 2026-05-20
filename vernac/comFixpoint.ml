@@ -468,14 +468,15 @@ let interp_mutual_definition env ~program_mode ~poly ~function_mode rec_order fi
     let impls = compute_internalization_env env sigma ~force Recursive fixnames dummy_fixtypes fixrecimps in
     Metasyntax.with_syntax_protection (fun () ->
       List.iter (Metasyntax.set_notation_for_interpretation env impls) fixntns;
+      let rel_rec_sign = Context.Rel.of_list (List.map NamedDecl.to_rel_decl rec_sign) in
       List.fold_left5_map
         (fun sigma fixctximpenv (after,extradecl) ctx body ccl ->
            let impls = Id.Map.fold Id.Map.add fixctximpenv impls in
            let env', ctx =
-             if after then env, List.map NamedDecl.to_rel_decl rec_sign @ ctx
-             else push_named_context rec_sign env, extradecl@ctx in
-           interp_fix_body ~program_mode env' (Context.Rel.of_list ctx) sigma impls body (Vars.lift (List.length extradecl) ccl))
-        sigma fixctximpenvs fixextras (List.map Context.Rel.to_list fixctxs) fixl fixccls)
+             if after then env, Context.Rel.append rel_rec_sign ctx
+             else push_named_context rec_sign env, Context.Rel.append (Context.Rel.of_list extradecl) ctx in
+           interp_fix_body ~program_mode env' ctx sigma impls body (Vars.lift (List.length extradecl) ccl))
+        sigma fixctximpenvs fixextras fixctxs fixl fixccls)
       () in
 
   (* Build the fix declaration block *)
