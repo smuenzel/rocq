@@ -255,6 +255,8 @@ sig
       Outermost declarations are processed first. *)
   val fold_outside : (('c, 't, 'r) Declaration.pt -> 'a -> 'a) -> ('c, 't, 'r) pt -> init:'a -> 'a
 
+  val fold_outside2 : ('a -> ('c, 't, 'r) Declaration.pt -> 'b -> 'b) -> 'a list -> ('c, 't, 'r) pt -> init:'b -> 'b
+
   val fold_outside_map : (('c, 't, 'r) Declaration.pt -> 'a -> ('c, 't, 'r) Declaration.pt * 'a) -> ('c, 't, 'r) pt -> init:'a -> ('c, 't, 'r) pt * 'a
 
   (** Return the set of all named variables bound in a given rel-context. *)

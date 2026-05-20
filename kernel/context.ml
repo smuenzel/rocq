@@ -355,6 +355,8 @@ struct
     let l, result = List.fold_right_map f l init in
     (n, l), result
 
+  let fold_outside2 f l' (_, l) ~init = List.fold_right2 f l' l init
+
   (** Return the set of all named variables bound in a given rel-context. *)
   let to_vars (_, l) =
     List.fold_left (fun accu decl ->
