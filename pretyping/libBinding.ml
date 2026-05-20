@@ -71,17 +71,16 @@ struct
     fun s sigma -> return (RelDecl.map_constr (fun t -> snd @@ weaken t s sigma) decl) s sigma
 
   let weaken_context cxt s sigma =
-    let cxt = Context.Rel.to_list cxt in
-    let nb_cxt = List.length cxt in
-    let wcxt = List.mapi (fun i x ->
+    let nb_cxt = Context.Rel.length cxt in
+    let wcxt = Context.Rel.map_decl_i (fun i x ->
       let n = nb_cxt - i -1 in
       let weak x = Vars.exliftn (Esubst.el_liftn n s.subst) x in
       match x with
       | LocalAssum (na, ty) -> LocalAssum (na, weak ty)
       | LocalDef (na, bd, ty) -> LocalDef (na, weak bd, weak ty)
-      ) cxt
+      ) 0 cxt
     in
-    return (Context.Rel.of_list wcxt) s sigma
+    return wcxt s sigma
 
 (** {6 Access Key } *)
 
