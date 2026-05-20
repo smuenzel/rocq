@@ -228,6 +228,8 @@ struct
   let to_list (_, ctx) = ctx
   let of_list ctx = List.length ctx, ctx
 
+  let of_list_map f l = List.length l, List.map f l
+
   let to_list_map f (_, ctx) = List.map f ctx
   let to_list_rev_map f (_, ctx) = List.rev_map f ctx
 

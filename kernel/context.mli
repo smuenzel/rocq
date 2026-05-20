@@ -141,6 +141,7 @@ sig
   (** Conversion to and from the underlying list representation. *)
   val to_list : ('c, 't, 'r) pt -> ('c, 't, 'r) Declaration.pt list
   val of_list : ('c, 't, 'r) Declaration.pt list -> ('c, 't, 'r) pt
+  val of_list_map : ('a -> ('c, 't, 'r) Declaration.pt) -> 'a list -> ('c, 't, 'r) pt
 
   val to_list_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
   val to_list_rev_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
