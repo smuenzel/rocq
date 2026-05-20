@@ -323,6 +323,8 @@ struct
     let result = List.Smart.map f ctx in
     if result == ctx then rctx else n, result
 
+  let map_decl2 f l (n, ctx) = n, List.map2 f l ctx
+
 
   let filter f (_, ctx) = List.filter f ctx |> of_list
 

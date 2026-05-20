@@ -214,6 +214,9 @@ sig
   val map_decl_i : (int -> ('c1, 't1, 'r1) Declaration.pt -> ('c2, 't2, 'r2) Declaration.pt) ->
     int -> ('c1, 't1, 'r1) pt -> ('c2, 't2, 'r2) pt
 
+  val map_decl2 : ('a -> ('c1, 't1, 'r1) Declaration.pt -> ('c2, 't2, 'r2) Declaration.pt) ->
+    'a list -> ('c1, 't1, 'r1) pt -> ('c2, 't2, 'r2) pt
+
   (** Like {!map_decl} but returns the original context unchanged if no
       declaration is modified (checked via physical equality). *)
   val map_decl_smart : (('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) Declaration.pt) ->

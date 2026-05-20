@@ -662,7 +662,7 @@ let it_mkLambda_or_LetIn infos ctx t =
   | Some (LocalAssum (n, ty), rctx) ->
       let assums, rctx = Context.Rel.to_list_until (function LocalAssum (n, ty) -> Some (n, ty) | LocalDef _ -> None) rctx in
       let assums = (n, ty) :: assums in
-      { term = FLambda(Context.Rel.length assums, assums,
+      { term = FLambda(List.length assums, assums,
                        Term.it_mkLambda_or_LetIn (term_of_fconstr t) (Context.Rel.rev rctx), (subs_id l, UVars.Instance.empty)); mark = t.mark }
   | Some (LocalDef _, _) ->
       mk_clos (subs_id l, UVars.Instance.empty) (Term.it_mkLambda_or_LetIn (term_of_fconstr t) ctx)

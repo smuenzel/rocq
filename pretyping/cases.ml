@@ -846,7 +846,8 @@ let get_names avoid env sigma sign eqns =
 (* We now replace the names y1 .. yn y by the actual names       *)
 (* xi1 .. xin xi to be found in the i-th clause of the matrix    *)
 
-let recover_initial_subpattern_names = List.map2 RelDecl.set_name
+let recover_initial_subpattern_names names sign =
+  Context.Rel.map_decl2 RelDecl.set_name names sign
 
 let recover_and_adjust_alias_names (_,avoid) names sign =
   let rec aux = function
@@ -858,17 +859,20 @@ let recover_and_adjust_alias_names (_,avoid) names sign =
       (DAst.make @@ PatVar na.binder_name, decl) :: aux (names,sign)
   | _ -> assert false
   in
-  List.split (aux (names,sign))
+  let names, sign =
+    List.split (aux (names,Context.Rel.to_list sign))
+  in
+  names, Context.Rel.of_list sign
 
 let push_rels_eqn ~hypnaming sigma sign eqn =
   {eqn with
      rhs = {eqn.rhs with rhs_env = snd (push_rel_context ~hypnaming sigma sign eqn.rhs.rhs_env) } }
 
 let push_rels_eqn_with_names sigma sign eqn =
-  let subpats = List.rev (List.firstn (List.length sign) eqn.patterns) in
+  let subpats = List.rev (List.firstn (Context.Rel.length sign) eqn.patterns) in
   let subpatnames = List.map alias_of_pat subpats in
   let sign = recover_initial_subpattern_names subpatnames sign in
-  push_rels_eqn sigma (Context.Rel.of_list sign) eqn
+  push_rels_eqn sigma sign eqn
 
 let push_generalized_decl_eqn ~hypnaming env sigma n decl eqn =
   match RelDecl.get_name decl with
@@ -1436,7 +1440,7 @@ let build_branch ~program_mode initial current realargs deps (realnames,curname)
       tomatch = tomatch;
       pred = pred;
       history = history;
-      mat = List.map (push_rels_eqn_with_names ~hypnaming sigma (Context.Rel.to_list typs)) submat }
+      mat = List.map (push_rels_eqn_with_names ~hypnaming sigma typs) submat }
 
 (**********************************************************************
  INVARIANT:
@@ -1865,17 +1869,16 @@ let build_inversion_problem ~program_mode loc env sigma tms t =
         let indf' = lift_inductive_family n indf in
         let sign = make_arity_signature !!env sigma true indf' in
         let patl = pat :: List.rev patl in
-        let sign_list = Context.Rel.to_list sign in
-        let patl,sign_list = recover_and_adjust_alias_names acc patl sign_list in
+        let patl,sign = recover_and_adjust_alias_names acc patl sign in
         let p = List.length patl in
-        let _,env' = push_rel_context ~hypnaming sigma (Context.Rel.of_list sign_list) env in
-        let patl',acc_sign,acc = aux (n+p) env' (sign_list @ acc_sign) tms acc in
+        let _,env' = push_rel_context ~hypnaming sigma sign env in
+        let patl',acc_sign,acc = aux (n+p) env' (Context.Rel.append sign acc_sign) tms acc in
         List.rev_append patl patl',acc_sign,acc
     | (t, NotInd (bo,typ)) :: tms ->
       let pat,acc = make_patvar t acc in
       let typ = lift n typ in
       let d = LocalAssum (annotR (alias_of_pat pat),typ) in
-      let patl,acc_sign,acc = aux (n+1) (snd (push_rel ~hypnaming sigma d env)) (d::acc_sign) tms acc in
+      let patl,acc_sign,acc = aux (n+1) (snd (push_rel ~hypnaming sigma d env)) Context.Rel.(add d acc_sign) tms acc in
       pat::patl,acc_sign,acc in
   let avoid0 = GlobEnv.vars_of_env env in
   (* [patl] is a list of patterns revealing the substructure of
@@ -1887,13 +1890,13 @@ let build_inversion_problem ~program_mode loc env sigma tms t =
      to ti are pi1..pin_i, then subst(pij) is uij; the substitution is
      useful to recognize which subterms of the whole type T of the original
      problem have to be abstracted *)
-  let patl,sign,(subst,avoid) = aux 0 env [] tms ([],avoid0) in
-  let n = List.length sign in
+  let patl,sign,(subst,avoid) = aux 0 env Context.Rel.empty tms ([],avoid0) in
+  let n = Context.Rel.length sign in
 
   let decls =
-    List.map_i (fun i d -> (mkRel i, map_constr (lift i) d)) 1 sign in
+    Context.Rel.to_list_map_i (fun i d -> (mkRel i, map_constr (lift i) d)) 1 sign in
 
-  let _,pb_env = push_rel_context ~hypnaming sigma (Context.Rel.of_list sign) env in
+  let _,pb_env = push_rel_context ~hypnaming sigma sign env in
   let decls =
     List.map (fun (c,d) -> (c,extract_inductive_data !!(pb_env) sigma d,d)) decls in
 
