@@ -673,11 +673,7 @@ Theorem eq_trans_map {A B} {x1 x2 x3:A} {y1:B x1} {y2:B x2} {y3:B x3}
   (H1:x1=x2) (H2:x2=x3) (H1': rew H1 in y1 = y2) (H2': rew H2 in y2 = y3) :
   rew eq_trans H1 H2 in y1 = y3.
 Proof.
-  refine (match H2 in (_ = a) return
-    forall (y3 : B a) (H2' : rew [B] H2 in y2 = y3),
-    rew [B] eq_trans H1 H2 in y1 = y3
-  with eq_refl => fun y3 H2' => _ end y3 H2').
-  exact (eq_trans H1' H2').
+  destruct H2. exact (eq_trans H1' H2').
 Defined.
 
 Lemma map_subst {A} {P Q:A->Type} (f : forall x, P x -> Q x) {x y} (H:x=y) (z:P x) :
