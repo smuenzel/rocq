@@ -114,7 +114,7 @@ let endclausestac id_map clseq gl_id cl0 =
   | _ -> EConstr.map sigma unmark c in
   let utac hyp =
     Tactics.convert_hyp ~check:false ~reorder:false (NamedDecl.map_constr unmark hyp) in
-  let utacs = List.map utac (Proofview.Goal.hyps gl) in
+  let utacs = Context.Named.to_list_map utac (Proofview.Goal.hyps gl) in
   let ugtac =
     Proofview.Goal.enter begin fun gl ->
       let concl = Proofview.Goal.concl gl in

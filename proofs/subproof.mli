@@ -52,6 +52,6 @@ val declare_abstract :
   EConstr.t -> Evd.evar_map * EConstr.t * EConstr.t list * bool
 
 val shrink_entry :
-  ('a, 'b, 'c) Context.Named.Declaration.pt list ->
+  EConstr.named_context ->
   Constr.constr ->
   Constr.types -> Constr.constr * Constr.constr * EConstr.t list

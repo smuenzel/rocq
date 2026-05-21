@@ -379,4 +379,4 @@ let match_goal env sigma hyps concl rules =
     let sigma = sigma
   end in
   let module M = PatternMatching(E) in
-  M.run (M.match_goal imatching_error hyps concl rules)
+  M.run (M.match_goal imatching_error (Context.Named.to_list hyps) concl rules)

@@ -80,13 +80,13 @@ end
 let shrink ctx sign c t accu =
   let open Constr in
   let open Vars in
-  let rec shrink_aux ctx sign c t accu = match ctx, sign with
-  | [], [] -> (c, t, accu)
-  | p :: ctx, decl :: sign ->
+  let rec shrink_aux ctx sign c t accu = match ctx, Context.Named.uncons sign with
+  | [], None -> (c, t, accu)
+  | p :: ctx_rest, Some (decl, sign_rest) ->
     if noccurn 1 c && noccurn 1 t then
       let c = subst1 mkProp c in
       let t = subst1 mkProp t in
-      shrink_aux ctx sign c t accu
+      shrink_aux ctx_rest sign_rest c t accu
     else
       let c = Term.mkLambda_or_LetIn p c in
       let t = Term.mkProd_or_LetIn p t in
@@ -94,7 +94,7 @@ let shrink ctx sign c t accu =
         then EConstr.mkVar (NamedDecl.get_id decl) :: accu
         else accu
       in
-      shrink_aux ctx sign c t accu
+      shrink_aux ctx_rest sign_rest c t accu
   | _ -> assert false
   in
   shrink_aux (Context.Rel.to_list ctx) sign c t accu
@@ -104,7 +104,7 @@ let shrink ctx sign c t accu =
     where all non-dependent [xi] are removed, as well as a
     restriction [args] of [x1..xn] such that [c' args] = [c x1..xn] *)
 let shrink_entry sign body typ =
-  let (ctx, body, typ) = Term.decompose_lambda_prod_n_decls (List.length sign) body typ in
+  let (ctx, body, typ) = Term.decompose_lambda_prod_n_decls (Context.Named.length sign) body typ in
   let (body, typ, args) = shrink ctx sign body typ [] in
   body, typ, args
 
@@ -198,7 +198,7 @@ let declare_abstract ~name ~poly ~sign ~secsign ~opaque ~solve_tac env sigma con
         let secctx =
           let env = Global.env () in
           let hyps =
-            if List.is_empty (Environ.named_context env) then Id.Set.empty
+            if Context.Named.is_empty (Environ.named_context env) then Id.Set.empty
             else
               let ids_typ = Environ.global_vars_set env typ in
               let vars = Environ.global_vars_set env body in

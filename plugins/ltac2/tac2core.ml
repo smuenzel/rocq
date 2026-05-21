@@ -1145,7 +1145,7 @@ let () =
   pf_apply @@ fun env _ ->
   let open Context in
   let open Named.Declaration in
-  let hyps = List.rev (Environ.named_context env) in
+  let hyps = Context.Named.to_list_rev (Environ.named_context env) in
   let map = function
   | LocalAssum (id, t) ->
     let t = EConstr.of_constr t in

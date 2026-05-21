@@ -8,7 +8,6 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-open Util
 open Termops
 open EConstr
 
@@ -54,14 +53,14 @@ let cache_term_by_tactic_then ~opaque ~name_op ?(goal_type=None) tac tacK =
     let section_sign = Global.named_context_val () in
     let goal_sign = Proofview.Goal.hyps gl in
     let sign,secsign =
-      List.fold_right
+      Context.Named.fold_outside
         (fun d (s1,s2) ->
            let id = NamedDecl.get_id d in
            if mem_named_context_val id section_sign &&
               interpretable_as_section_decl env sigma (lookup_named_val id section_sign) d
            then (s1,push_named_context_val d s2)
            else (Context.Named.add d s1,s2))
-        goal_sign (Context.Named.empty, Environ.empty_named_context_val)
+        goal_sign ~init:(Context.Named.empty, Environ.empty_named_context_val)
     in
     let bad id = match lookup_named_val id section_sign with
     | (_ : named_declaration) -> true
@@ -80,7 +79,7 @@ let cache_term_by_tactic_then ~opaque ~name_op ?(goal_type=None) tac tacK =
     in
     let concl = it_mkNamedProd_or_LetIn sigma concl sign in
     let solve_tac = tclCOMPLETE
-        (Tactics.intros_mustbe_force (List.rev_map NamedDecl.get_id sign) <*>
+        (Tactics.intros_mustbe_force (Context.Named.to_list_rev_map NamedDecl.get_id sign) <*>
          tac)
     in
     let sigma, lem, args, safe =

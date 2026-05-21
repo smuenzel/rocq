@@ -869,7 +869,7 @@ let generalize_dependent_of x hyp =
                       (Proofview.Goal.sigma g) x t ->
             tclTHEN (Generalize.generalize [EConstr.mkVar id]) (thin [id])
           | _ -> Proofview.tclUNIT ())
-        (Proofview.Goal.hyps g))
+        (Context.Named.to_list (Proofview.Goal.hyps g)))
 
 let rec intros_with_rewrite () =
   observe_tac "intros_with_rewrite" (intros_with_rewrite_aux ())

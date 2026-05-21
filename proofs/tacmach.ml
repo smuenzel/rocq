@@ -8,7 +8,6 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-open Util
 open Namegen
 open Termops
 open Reductionops
@@ -64,13 +63,13 @@ let pf_get_hyp_typ id gl =
 let pf_hyps_types gl =
   let env = Proofview.Goal.env gl in
   let sign = Environ.named_context env in
-  List.map (function LocalAssum (id,x)
+  Context.Named.to_list_map (function LocalAssum (id,x)
                     | LocalDef (id,_,x) -> id.Context.binder_name, EConstr.of_constr x)
             sign
 
 let pf_last_hyp gl =
   let hyps = Proofview.Goal.hyps gl in
-  List.hd hyps
+  Context.Named.hd hyps
 
 let pf_nf_concl (gl : Proofview.Goal.t) =
   (* We normalize the conclusion just after *)

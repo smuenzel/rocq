@@ -875,7 +875,7 @@ and detype_r d flags avoid env sigma t =
           let ctx = Evd.evar_filtered_context info in
           let get_instance f =
             let fold d c acc = if f d c then acc else (get_id d, c) :: acc in
-            List.fold_right2 fold ctx cl []
+            List.fold_right2 fold (Context.Named.to_list ctx) cl []
           in
           let l = get_instance bound_to_itself_or_letin in
           (* If the instance is {x:=y; y:=y; z:=z} we print {x:=y; y:=y}

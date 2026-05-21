@@ -15,13 +15,13 @@ open Context.Named.Declaration
 module NamedDecl = Context.Named.Declaration
 
 let extract_prefix env info =
-  let ctx1 = List.rev (EConstr.named_context env) in
-  let ctx2 = List.rev (Evd.evar_context info) in
+  let ctx1 = Context.Named.to_list_rev (EConstr.named_context env) in
+  let ctx2 = Context.Named.to_list_rev (Evd.evar_context info) in
   let rec share l1 l2 accu = match l1, l2 with
   | d1 :: l1, d2 :: l2 ->
     if d1 == d2 then share l1 l2 (d1 :: accu)
-    else (accu, d2 :: l2)
-  | _ -> (accu, l2)
+    else (Context.Named.of_list accu, d2 :: l2)
+  | _ -> (Context.Named.of_list accu, l2)
   in
   share ctx1 ctx2 []
 

@@ -528,7 +528,7 @@ let to_named_decl sigma (d:named_declaration) : Constr.named_declaration =
 let to_named_context sigma (ctx:named_context) : Constr.named_context =
   let Refl = unsafe_eq in
   let Refl = unsafe_relevance_eq in
-  List.Smart.map (to_named_decl sigma) ctx
+  Context.Named.map_decl (to_named_decl sigma) ctx
 
 let map_branches f br =
   let f c = unsafe_to_constr (f (of_constr c)) in
@@ -538,21 +538,21 @@ let map_return_predicate f p =
   of_return (Constr.map_return_predicate f (unsafe_to_return p))
 
 let map_instance sigma f evk args =
-  let rec map ctx args = match ctx, SList.view args with
-  | [], None -> SList.empty
-  | decl :: ctx, Some (Some c, rem) ->
+  let rec map ctx args = match Context.Named.uncons ctx, SList.view args with
+  | None, None -> SList.empty
+  | Some (decl, ctx), Some (Some c, rem) ->
     let c' = f c in
     let rem' = map ctx rem in
     if c' == c && rem' == rem then args
     else if Constr.isVarId (NamedDecl.get_id decl) c' then SList.default rem'
     else SList.cons c' rem'
-  | decl :: ctx, Some (None, rem) ->
+  | Some (decl, ctx), Some (None, rem) ->
     let c = Constr.mkVar (NamedDecl.get_id decl) in
     let c' = f c in
     let rem' = map ctx rem in
     if c' == c && rem' == rem then args
     else SList.cons c' rem'
-  | [], Some _ | _ :: _, None -> assert false
+  | Some _, None | None, Some _ -> assert false
   in
   let EvarInfo evi = Evd.find sigma evk in
   let ctx = Evd.evar_filtered_context evi in
@@ -1145,10 +1145,10 @@ let it_mkLambda_or_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkLambda_or
 let it_mkProd_wo_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkProd_wo_LetIn d c) ~init:t ctx
 let it_mkLambda_wo_LetIn t ctx = Context.Rel.fold_inside (fun c d -> mkLambda_wo_LetIn d c) ~init:t ctx
 
-let it_mkNamedProd_or_LetIn sigma t ctx = List.fold_left (fun c d -> mkNamedProd_or_LetIn sigma d c) t ctx
-let it_mkNamedLambda_or_LetIn sigma t ctx = List.fold_left (fun c d -> mkNamedLambda_or_LetIn sigma d c) t ctx
+let it_mkNamedProd_or_LetIn sigma t ctx = Context.Named.fold_inside (fun c d -> mkNamedProd_or_LetIn sigma d c) ~init:t ctx
+let it_mkNamedLambda_or_LetIn sigma t ctx = Context.Named.fold_inside (fun c d -> mkNamedLambda_or_LetIn sigma d c) ~init:t ctx
 
-let it_mkNamedProd_wo_LetIn sigma t ctx = List.fold_left (fun c d -> mkNamedProd_wo_LetIn sigma d c) t ctx
+let it_mkNamedProd_wo_LetIn sigma t ctx = Context.Named.fold_inside (fun c d -> mkNamedProd_wo_LetIn sigma d c) ~init:t ctx
 
 let rec isArity sigma c =
   match kind sigma c with
@@ -1211,7 +1211,7 @@ let match_named_context_val :
   | Refl, Refl -> match_named_context_val
 
 let identity_subst_val : named_context_val -> t SList.t = fun ctx ->
-  SList.defaultn (List.length ctx.Environ.env_named_ctx) SList.empty
+  SList.defaultn (Context.Named.length ctx.Environ.env_named_ctx) SList.empty
 
 let fresh_global ?loc ?rigid ?names env sigma reference =
   let (evd,t) = Evd.fresh_global ?loc ?rigid ?names env sigma reference in

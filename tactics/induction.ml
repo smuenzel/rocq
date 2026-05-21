@@ -251,13 +251,13 @@ let mkletin_goal env sigma with_eq dep (id,lastlhyp,ccl,c) ty =
       let sigma, eq = Typing.checked_applist env sigma eq [t] in
       let eq = applist (eq,args) in
       let refl = applist (refl, [t;mkVar id]) in
-      let newenv = insert_before [LocalAssum (make_annot heq ERelevance.relevant,eq); decl] lastlhyp env in
+      let newenv = insert_before (Context.Named.of_list [LocalAssum (make_annot heq ERelevance.relevant,eq); decl]) lastlhyp env in
       let (sigma, x) = new_evar newenv sigma ccl in
       (sigma, mkNamedLetIn sigma (make_annot id r) c t
          (mkNamedLetIn sigma (make_annot heq ERelevance.relevant) refl eq x),
       Some (fst @@ destEvar sigma x))
   | None ->
-      let newenv = insert_before [decl] lastlhyp env in
+      let newenv = insert_before (Context.Named.of_list [decl]) lastlhyp env in
       let (sigma, x) = new_evar newenv sigma ccl in
       (sigma, mkNamedLetIn sigma (make_annot id r) c t x, Some (fst @@ destEvar sigma x))
 
@@ -1094,7 +1094,7 @@ let apply_induction_in_context with_evars inhyps elim indvars names =
     | ElimUsingList _ -> None
     in
     let statuslists,lhyp0,toclear,deps,avoid,dep_in_hyps = cook_sign hyp0 inhyps indvars env sigma in
-    let tmpcl = it_mkNamedProd_or_LetIn sigma concl deps in
+    let tmpcl = it_mkNamedProd_or_LetIn sigma concl (Context.Named.of_list deps) in
     let s = Retyping.get_sort_quality_or_set_of env sigma tmpcl in
     let deps_cstr =
       List.fold_left
@@ -1239,7 +1239,7 @@ let clear_unselected_context id inhyps cls =
           (* erase if not selected and dependent on id or selected hyps *)
           let test id = occur_var_in_decl env sigma id d in
           if List.exists test (id::inhyps) then Some id' else None in
-      let ids = List.map_filter to_erase (Proofview.Goal.hyps gl) in
+      let ids = List.filter_map (fun x -> x) (Context.Named.to_list_map to_erase (Proofview.Goal.hyps gl)) in
       clear ids
   | None -> Proofview.tclUNIT ()
   end

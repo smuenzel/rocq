@@ -236,10 +236,7 @@ let rec e_trivial_fail_db db_list local_db secvars =
     begin fun gl ->
     let env = Proofview.Goal.env gl in
     let sigma = Proofview.Goal.sigma gl in
-    let d = match EConstr.named_context env with
-    | [] -> assert false
-    | d :: _ -> NamedDecl.get_id d
-    in
+    let d = NamedDecl.get_id (Context.Named.hd (EConstr.named_context env)) in
     let hints = push_resolve_hyp env sigma d local_db in
     e_trivial_fail_db db_list hints secvars
     end
@@ -444,7 +441,7 @@ let make_resolve_hyp env sigma st only_classes decl db =
 
 let make_hints env sigma (modes,st) only_classes sign =
   let db = Hint_db.add_modes modes @@ Hint_db.empty st true in
-  List.fold_right
+  Context.Named.fold_outside
     (fun hyp hints ->
       let consider =
         not only_classes ||
@@ -456,7 +453,7 @@ let make_hints env sigma (modes,st) only_classes sign =
       if consider then
         make_resolve_hyp env sigma st only_classes hyp hints
       else hints)
-    sign db
+    sign ~init:db
 
 module Intpart = Unionfind.Make(Evar.Set)(Evar.Map)
 
@@ -885,10 +882,7 @@ module Search = struct
     let open Proofview in
     let env = Goal.env gl in
     let sigma = Goal.sigma gl in
-    let decl = match EConstr.named_context env with
-    | [] -> assert false
-    | decl :: _ -> decl
-    in
+    let decl = Context.Named.hd (EConstr.named_context env) in
     let ldb =
       make_resolve_hyp env sigma (Hint_db.transparent_state info.search_hints)
                        info.search_only_classes decl info.search_hints in

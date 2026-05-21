@@ -84,7 +84,7 @@ let push_level_constraints uctx sec =
 let open_section ~custom prev =
   {
     prev;
-    context = [];
+    context = Context.Named.empty;
     mono_universes = Univ.ContextSet.empty;
     poly_universes = UContext.empty;
     all_poly_univs = Option.cata (fun sec -> sec.all_poly_univs) Instance.empty prev;
@@ -99,11 +99,11 @@ let close_section sec =
   sec.prev, sec.entries, sec.mono_universes, sec.custom
 
 let push_local d sec =
-  { sec with context = d :: sec.context }
+  { sec with context = Context.Named.add d sec.context }
 
 let extract_hyps vars used =
   (* Only keep the part that is used by the declaration *)
-  List.filter (fun d -> Id.Set.mem (NamedDecl.get_id d) used) vars
+  Context.Named.filter (fun d -> Id.Set.mem (NamedDecl.get_id d) used) vars
 
 let segment_of_entry env e uctx sec =
   let hyps = match e with
@@ -141,7 +141,7 @@ let is_in_section _env gr sec =
   match gr with
   | VarRef id ->
     let vars = sec.context in
-    List.exists (fun decl -> Id.equal id (NamedDecl.get_id decl)) vars
+    Context.Named.exists (fun decl -> Id.equal id (NamedDecl.get_id decl)) vars
   | ConstRef con ->
     Cmap_env.mem con (fst sec.expand_info_map)
   | IndRef (ind, _) | ConstructRef ((ind, _), _) ->

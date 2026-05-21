@@ -457,7 +457,7 @@ let pr_context_unlimited ?flags env sigma =
 
 let pr_ne_context_of header ?flags env sigma =
   if Context.Rel.length (Environ.rel_context env) = 0 &&
-    List.is_empty (Environ.named_context env)  then (mt ())
+    Context.Named.is_empty (Environ.named_context env)  then (mt ())
   else let penv = pr_context_unlimited ?flags env sigma in (header ++ penv ++ fnl ())
 
 (* Heuristic for horizontalizing hypothesis that the user probably
@@ -618,7 +618,7 @@ let pr_evgl_sign ?(flags=current_combined()) env sigma (evi : undefined evar_inf
   let ps = pr_named_context_of ~flags env sigma in
   let _, l = match Filter.repr (evar_filter evi) with
   | None -> [], []
-  | Some f -> List.filter2 (fun b c -> not b) f (evar_context evi)
+  | Some f -> List.filter2 (fun b c -> not b) f (Context.Named.to_list (evar_context evi))
   in
   let ids = List.rev_map NamedDecl.get_id l in
   let warn =
@@ -808,7 +808,7 @@ let process_dependent_evar q acc evm is_dependent e =
     let env = Evd.evar_filtered_env (Global.env ()) evi in
     queue_term q true (Retyping.get_type_of env evm b)
   in
-  List.iter begin fun decl ->
+  Context.Named.iter_decl begin fun decl ->
     let open NamedDecl in
     queue_term q true (NamedDecl.get_type decl);
     match decl with

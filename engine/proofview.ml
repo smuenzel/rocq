@@ -927,7 +927,7 @@ module Progress = struct
          false
     in
     (* NB: can't use List.equal because it shortcuts on physical equality *)
-    List.for_all2eq eq_named_declaration c1 c2
+    List.for_all2eq eq_named_declaration (Context.Named.to_list c1) (Context.Named.to_list c2)
 
   let eq_evar_body (type a1 a2) sigma1 sigma2 (b1 : a1 Evd.evar_body) (b2 : a2 Evd.evar_body) =
     let open Evd in
@@ -964,7 +964,7 @@ module Progress = struct
     | LocalDef (i1, _, _), LocalDef (i2, _, _) -> Context.eq_annot Names.Id.equal r_eq i1 i2
     | _ -> false
     in
-    List.for_all2eq eq_named_declaration c1 c2
+    List.for_all2eq eq_named_declaration (Context.Named.to_list c1) (Context.Named.to_list c2)
 
   let fast_eq_evar_info ei1 ei2 =
     fast_eq_evar_body ei1 ei2 &&

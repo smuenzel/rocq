@@ -61,14 +61,13 @@ let fresh_id_in_env avoid id env =
    [ctxt |- G(x1..xn] into [ctxt |- forall hyps, G(x1..xn)] *)
 
 let bring_hyps hyps =
-  if List.is_empty hyps then Tacticals.tclIDTAC
+  if Context.Named.is_empty hyps then Tacticals.tclIDTAC
   else
-    let hyps = List.rev hyps in
     Proofview.Goal.enter begin fun gl ->
       let env = Proofview.Goal.env gl in
       let sigma = Proofview.Goal.sigma gl in
       let concl = Proofview.Goal.concl gl in
-      let newcl = it_mkNamedProd_or_LetIn sigma concl hyps in
+      let newcl = Context.Named.fold_outside (fun d c -> mkNamedProd_or_LetIn sigma d c) hyps ~init:concl in
       let args = Context.Named.instance mkVar hyps in
       Refine.refine_with_principal ~typecheck:false begin fun sigma ->
         let (sigma, ev) =
@@ -79,7 +78,7 @@ let bring_hyps hyps =
 
 let revert hyps =
   Proofview.Goal.enter begin fun gl ->
-    let ctx = List.map (fun id -> Tacmach.pf_get_hyp id gl) hyps in
+    let ctx = Context.Named.of_list (List.map (fun id -> Tacmach.pf_get_hyp id gl) hyps) in
       (bring_hyps ctx) <*> (Tactics.clear hyps)
   end
 
@@ -154,13 +153,13 @@ let generalize_dep ?(with_let=false) c =
   let sign = named_context_val env in
   let init_ids = ids_of_named_context (Global.named_context()) in
   let seek (d:named_declaration) (toquant:named_context) =
-    if List.exists (fun d' -> occur_var_in_decl env sigma (NamedDecl.get_id d') d) toquant
+    if Context.Named.exists (fun d' -> occur_var_in_decl env sigma (NamedDecl.get_id d') d) toquant
       || dependent_in_decl sigma c d then
-      d::toquant
+      Context.Named.add d toquant
     else
       toquant in
-  let to_quantify = Context.Named.fold_outside seek (named_context_of_val sign) ~init:[] in
-  let qhyps = List.map NamedDecl.get_id to_quantify in
+  let to_quantify = Context.Named.fold_outside seek (named_context_of_val sign) ~init:Context.Named.empty in
+  let qhyps = Context.Named.to_list_map NamedDecl.get_id to_quantify in
   let tothin = List.filter (fun id -> not (Id.List.mem id init_ids)) qhyps in
   let tothin' =
     match EConstr.kind sigma c with

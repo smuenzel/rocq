@@ -1486,7 +1486,7 @@ let get_previous_hyp_position id gl =
     let hyp = Context.Named.Declaration.get_id d in
     if Id.equal hyp id then dest else aux (MoveAfter hyp) right
   in
-  aux MoveLast (Proofview.Goal.hyps gl)
+  aux MoveLast (Context.Named.to_list (Proofview.Goal.hyps gl))
 
 let injEq flags ?(injection_in_context = injection_in_context_flag ()) with_evars clear_flag ipats =
   (* Decide which compatibility mode to use *)
@@ -1771,7 +1771,7 @@ let test_non_indirectly_dependent_section_variable gl x =
   let sigma = Proofview.Goal.sigma gl in
   let hyps = Proofview.Goal.hyps gl in
   let concl = Proofview.Goal.concl gl in
-  List.iter (fun decl ->
+  Context.Named.iter_decl (fun decl ->
     NamedDecl.iter_constr (fun c ->
       match occur_var_indirectly env sigma x c with
       | Some gr -> raise (FoundDepInGlobal (Some (NamedDecl.get_id decl), gr))
@@ -1801,7 +1801,7 @@ let is_non_indirectly_dependent_section_variable gl z =
 let subst_one dep_proof_ok x (hyp,rhs,dir) =
   Proofview.Goal.enter begin fun gl ->
   let sigma = Proofview.Goal.sigma gl in
-  let hyps = Proofview.Goal.hyps gl in
+  let hyps = Context.Named.to_list (Proofview.Goal.hyps gl) in
   let concl = Proofview.Goal.concl gl in
   (* The set of hypotheses using x *)
   let dephyps =
@@ -1909,7 +1909,7 @@ let subst_all ?(flags=default_subst_tactic_flags) () =
       end
   in
   Proofview.Goal.enter begin fun gl ->
-    tclMAP process (List.rev (List.map NamedDecl.get_id (Proofview.Goal.hyps gl)))
+    tclMAP process (Context.Named.to_list_rev_map NamedDecl.get_id (Proofview.Goal.hyps gl))
   end
 
 (* Rewrite the first assumption for which a condition holds
@@ -1936,9 +1936,9 @@ let cond_eq_term env sigma c t =
   with Constr_matching.PatternMatchingFailure -> failwith "not an equality"
 
 let rewrite_assumption_cond cond_eq_term cl =
-  let rec arec env sigma hyps = match hyps with
-    | [] -> user_err Pp.(str "No such assumption.")
-    | hyp ::rest ->
+  let rec arec env sigma hyps = match Context.Named.uncons hyps with
+    | None -> user_err Pp.(str "No such assumption.")
+    | Some (hyp, rest) ->
         let id = NamedDecl.get_id hyp in
         begin
           try

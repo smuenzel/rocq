@@ -699,7 +699,7 @@ let explain_occur_check env sigma ev rhs =
 
 let pr_trailing_ne_context_of env sigma =
   if Context.Rel.length (Environ.rel_context env) = 0 &&
-    List.is_empty (Environ.named_context env)
+    Context.Named.is_empty (Environ.named_context env)
   then str "."
   else (strbrk " in environment:" ++ pr_context_unlimited env sigma)
 

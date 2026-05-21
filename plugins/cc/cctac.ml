@@ -239,7 +239,7 @@ let make_prb env sigma concl depth additional_terms b =
                  neg_hyps:=(id,nh):: !neg_hyps
              | `Rule patts -> add_quant state id true patts
              | `Nrule patts -> add_quant state id false patts
-         end) (named_context env);
+         end) (Context.Named.to_list (named_context env));
     begin
       match atom_of_constr b env sigma concl with
           `Eq (t,a,b) -> add_disequality state Goal a b

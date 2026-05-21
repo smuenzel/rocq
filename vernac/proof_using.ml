@@ -23,7 +23,7 @@ let is_known_name id = CList.mem_assoc_f Id.equal id !known_names
 
 let rec close_fwd env sigma s =
   let s' =
-    List.fold_left (fun s decl ->
+    Context.Named.fold_inside (fun s decl ->
       let vb = match decl with
                | LocalAssum _ -> Id.Set.empty
                | LocalDef (_,b,_) -> Termops.global_vars_set env sigma b
@@ -32,7 +32,7 @@ let rec close_fwd env sigma s =
       let vbty = Id.Set.union vb vty in
       if Id.Set.exists (fun v -> Id.Set.mem v s) vbty
       then Id.Set.add (NamedDecl.get_id decl) (Id.Set.union s vbty) else s)
-    s (EConstr.named_context env)
+    ~init:s (EConstr.named_context env)
     in
   if Id.Set.equal s s' then s else close_fwd env sigma s'
 
@@ -44,7 +44,7 @@ let set_of_type env sigma fixnames ty =
 
 let full_set fixnames env =
   let add id ids = if List.mem_f Id.equal id fixnames then ids else Id.Set.add id ids in
-  List.fold_right add (List.map NamedDecl.get_id (named_context env)) Id.Set.empty
+  List.fold_right add (Context.Named.to_list_map NamedDecl.get_id (named_context env)) Id.Set.empty
 
 let warn_all_collection_precedence = CWarnings.create ~name:"all-collection-precedence" ~category:Deprecation.Version.v8_15
     Pp.(fun () -> str "Variable " ++ Id.print all_collection_id ++ str " is shadowed by Collection named " ++ Id.print all_collection_id ++ str " containing all variables.")
@@ -88,7 +88,7 @@ let process_expr env sigma fixnames e v_ty =
     else
     if List.exists (Id.equal id) fixnames then
       CErrors.user_err Pp.(str "Invalid recursive variable: " ++ Id.print id ++ str ".")
-    else if not (List.exists (NamedDecl.get_id %> Id.equal id) (named_context env)) then
+    else if not (Context.Named.exists (NamedDecl.get_id %> Id.equal id) (named_context env)) then
       CErrors.user_err Pp.(str "Unknown variable: " ++ Id.print id ++ str ".")
     else
       Id.Set.singleton id
@@ -153,8 +153,8 @@ let suggest_common env ppid used ids_typ skip =
 
   let needed = minimize_hyps env (remove_ids_and_lets env used ids_typ) in
   let all_needed = really_needed env needed in
-  let all = List.fold_left (fun all d -> S.add (NamedDecl.get_id d) all)
-      S.empty (named_context env)
+  let all = Context.Named.fold_inside (fun all d -> S.add (NamedDecl.get_id d) all)
+      ~init:S.empty (named_context env)
   in
   let all = S.diff all skip in
   let fwd_typ = close_fwd env (Evd.from_env env) ids_typ in
@@ -196,7 +196,7 @@ let suggest_constant env kn =
   then begin
     let open Declarations in
     let body = lookup_constant kn env in
-    let used = Id.Set.of_list @@ List.map NamedDecl.get_id body.const_hyps in
+    let used = Id.Set.of_list @@ Context.Named.to_list_map NamedDecl.get_id body.const_hyps in
     let ids_typ = global_vars_set env body.const_type in
     suggest_common env (Printer.pr_constant env kn) used ids_typ Id.Set.empty
   end

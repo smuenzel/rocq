@@ -115,7 +115,7 @@ type rewrule_not_allowed = Symb | Rule
 exception RewriteRulesNotAllowed of rewrule_not_allowed
 
 let empty_named_context_val = {
-  env_named_ctx = [];
+  env_named_ctx = Context.Named.empty;
   env_named_map = Id.Map.empty;
   env_named_idx = Range.empty;
 }
@@ -196,27 +196,25 @@ let push_named_context_val d ctxt =
     env_named_idx = Range.cons d ctxt.env_named_idx;
   }
 
-let match_named_context_val c = match c.env_named_ctx with
-| [] -> None
-| decl :: ctx ->
+let match_named_context_val c = match Context.Named.uncons c.env_named_ctx with
+| None -> None
+| Some (decl, ctx) ->
   let map = Id.Map.remove (NamedDecl.get_id decl) c.env_named_map in
   let cval = { env_named_ctx = ctx; env_named_map = map; env_named_idx = Range.tl c.env_named_idx } in
   Some (decl, cval)
 
 let map_named_val f ctxt =
   let open Context.Named.Declaration in
-  let fold accu d =
+  let map = ref ctxt.env_named_map in
+  let ctx = Context.Named.map_decl_smart (fun d ->
     let d' = f d in
-    let accu =
-      if d == d' then accu
-      else Id.Map.set (get_id d) d' accu
-    in
-    (accu, d')
-  in
-  let map, ctx = List.Smart.fold_left_map fold ctxt.env_named_map ctxt.env_named_ctx in
+    if d == d' then d'
+    else (map := Id.Map.set (get_id d) d' !map; d')
+  ) ctxt.env_named_ctx in
+  let map = !map in
   if map == ctxt.env_named_map then ctxt
   else
-    let idx = List.fold_right Range.cons ctx Range.empty in
+    let idx = Context.Named.fold_outside (fun d idx -> Range.cons d idx) ~init:Range.empty ctx in
     { env_named_ctx = ctx; env_named_map = map; env_named_idx = idx }
 
 let push_named d env =
@@ -232,7 +230,7 @@ let lookup_named_ctxt id ctxt =
   Id.Map.find id ctxt.env_named_map
 
 let record_global_hyps add kn hyps acc =
-  if CList.is_empty hyps then acc
+  if Context.Named.is_empty hyps then acc
   else add kn (Context.Named.to_vars hyps) acc
 
 let fold_constants f env acc =
@@ -433,10 +431,10 @@ let ids_of_named_context_val c = Id.Map.domain c.env_named_map
 
 let empty_named_context = Context.Named.empty
 
-let push_named_context = List.fold_right push_named
+let push_named_context ctx env = Context.Named.fold_outside push_named ctx ~init:env
 
 let val_of_named_context ctxt =
-  List.fold_right push_named_context_val ctxt empty_named_context_val
+  Context.Named.fold_outside push_named_context_val ctxt ~init:empty_named_context_val
 
 
 let eq_named_context_val c1 c2 =
@@ -1018,12 +1016,12 @@ let apply_to_hyp ctxt id f =
     match match_named_context_val ctxt with
     | Some (d, ctxt) ->
         if Id.equal (get_id d) id then
-          push_named_context_val (f ctxt.env_named_ctx d rtail) ctxt
+          push_named_context_val (f (named_context_of_val ctxt) d rtail) ctxt
         else
-          let ctxt' = aux (d::rtail) ctxt in
+          let ctxt' = aux (Context.Named.add d rtail) ctxt in
           push_named_context_val d ctxt'
     | None -> raise Hyp_not_found
-  in aux [] ctxt
+  in aux Context.Named.empty ctxt
 
 (* To be used in Logic.clear_hyps *)
 let remove_hyps ids check_context ctxt =

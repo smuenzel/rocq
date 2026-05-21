@@ -498,11 +498,11 @@ let tclTIME s t =
 let nthDecl m gl =
   let hyps = Proofview.Goal.hyps gl in
   try
-    List.nth hyps (m-1)
+    Context.Named.nth hyps (m-1)
   with Failure _ -> CErrors.user_err Pp.(str "No such assumption.")
 
 let nLastDecls gl n =
-  try List.firstn n (Proofview.Goal.hyps gl)
+  try Context.Named.firstn n (Proofview.Goal.hyps gl)
   with Failure _ -> CErrors.user_err Pp.(str "Not enough hypotheses in the goal.")
 
 let nthHypId m gl =
@@ -525,7 +525,7 @@ let onNthDecl m tac =
   end
 let onLastDecl  = onNthDecl 1
 
-let nLastHypsId gl n = List.map (NamedDecl.get_id) (nLastDecls gl n)
+let nLastHypsId gl n = Context.Named.to_list_map (NamedDecl.get_id) (nLastDecls gl n)
 let nLastHyps gl n = List.map mkVar (nLastHypsId gl n)
 
 let ifOnHyp pred tac1 tac2 id =
@@ -548,7 +548,7 @@ let onNLastHyps n tac   = onHyps (fun gl -> nLastHyps gl n) tac
 let afterHyp id tac =
   Proofview.Goal.enter begin fun gl ->
   let hyps = Proofview.Goal.hyps gl in
-  let rem, _ = List.split_when (NamedDecl.get_id %> Id.equal id) hyps in
+  let rem, _ = Context.Named.split_when (NamedDecl.get_id %> Id.equal id) hyps in
   tac rem
   end
 

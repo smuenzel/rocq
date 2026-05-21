@@ -60,7 +60,7 @@ and is_lazy_constant env cb =
   (* Bound universes are turned into lambda-abstractions *)
   UVars.AbstractContext.is_constant (Declareops.constant_polymorphic_context cb) &&
   (* So are context variables *)
-  List.is_empty cb.const_hyps &&
+  Context.Named.is_empty cb.const_hyps &&
   match cb.const_body with
   | Def body -> is_lazy env body
   | Undef _ | OpaqueDef _ | Primitive _ | Symbol _ -> false

@@ -455,12 +455,13 @@ let print_section_deps env ref =
     let mb = Environ.lookup_mind mind env in
     Some mb.mind_hyps
   in
-  let hyps = Option.map (List.filter NamedDecl.is_local_assum) hyps in
+  let hyps = Option.map (Context.Named.filter NamedDecl.is_local_assum) hyps in
   match hyps with
-  | None | Some [] -> []
+  | None -> []
+  | Some ctx when Context.Named.is_empty ctx -> []
   | Some hyps ->
-    [hov 0 (pr_global ref ++ str (String.plural (List.length hyps) " uses section variable") ++ spc () ++
-            hv 1 (prlist_with_sep spc (fun d -> Id.print (NamedDecl.get_id d)) (List.rev hyps)) ++ str ".")]
+    [hov 0 (pr_global ref ++ str (String.plural (Context.Named.length hyps) " uses section variable") ++ spc () ++
+            hv 1 (prlist_with_sep spc (fun d -> Id.print (NamedDecl.get_id d)) (Context.Named.to_list_rev hyps)) ++ str ".")]
 
 (** Printing bidirectionality status *)
 

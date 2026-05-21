@@ -1315,7 +1315,7 @@ let check_mind mie lab =
 
 let add_checked_mind kn mib senv =
   let mib =
-    match mib.mind_hyps with [] -> Declareops.hcons_mind mib | _ -> mib
+    if Context.Named.is_empty mib.mind_hyps then Declareops.hcons_mind mib else mib
   in
   add_field (MutInd.label kn,SFBmind mib) (I kn) senv
 

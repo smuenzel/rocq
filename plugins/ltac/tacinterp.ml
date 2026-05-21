@@ -1638,7 +1638,7 @@ and interp_match_goal ist lz lr lmr =
       let env = Proofview.Goal.env gl in
       let sigma = Proofview.Goal.sigma gl in
       let hyps = Proofview.Goal.hyps gl in
-      let hyps = if lr then List.rev hyps else hyps in
+      let hyps = if lr then Context.Named.rev hyps else hyps in
       let concl = Proofview.Goal.concl gl in
       let ilr = read_match_rule ist env sigma lmr in
       interp_match_successes lz ist (Tactic_matching.match_goal env sigma hyps concl ilr)

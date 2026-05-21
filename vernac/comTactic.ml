@@ -94,7 +94,7 @@ let check_par_applicable pstate =
       let g = Evd.find_undefined sigma0 goal in
       let concl, hyps = Evd.evar_concl g, Evd.evar_context g in
       Evarutil.is_ground_term sigma0 concl &&
-      List.for_all (Context.Named.Declaration.for_all (Evarutil.is_ground_term sigma0)) hyps in
+      Context.Named.for_all (Context.Named.Declaration.for_all (Evarutil.is_ground_term sigma0)) hyps in
     if not is_ground then
       CErrors.user_err
         Pp.(strbrk("The par: goal selector does not support goals with existential variables"))))

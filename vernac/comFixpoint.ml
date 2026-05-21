@@ -474,7 +474,7 @@ let interp_mutual_definition env ~program_mode ~poly ~function_mode rec_order fi
            let impls = Id.Map.fold Id.Map.add fixctximpenv impls in
            let env', ctx =
              if after then env, Context.Rel.append rel_rec_sign ctx
-             else push_named_context rec_sign env, Context.Rel.append (Context.Rel.of_list extradecl) ctx in
+             else push_named_context (Context.Named.of_list rec_sign) env, Context.Rel.append (Context.Rel.of_list extradecl) ctx in
            interp_fix_body ~program_mode env' ctx sigma impls body (Vars.lift (List.length extradecl) ccl))
         sigma fixctximpenvs fixextras fixctxs fixl fixccls)
       () in

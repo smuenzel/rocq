@@ -1910,7 +1910,7 @@ let micromega_gen parse_arith pre_process cnf spec dumpexpr prover tac =
         let hyps, concl, env =
           parse_goal (genv, sigma) parse_arith
             (Env.empty (genv, sigma))
-            (EConstr.named_context genv) concl
+            (Context.Named.to_list (EConstr.named_context genv)) concl
         in
         let env = Env.elements env in
         let spec = Lazy.force spec in
@@ -2041,7 +2041,7 @@ let micromega_genr prover tac =
         let hyps, concl, env =
           parse_goal (genv, sigma) parse_arith
             (Env.empty (genv, sigma))
-            (EConstr.named_context genv) concl
+            (Context.Named.to_list (EConstr.named_context genv)) concl
         in
         let env = Env.elements env in
         let spec = Lazy.force spec in

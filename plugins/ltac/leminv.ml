@@ -163,7 +163,7 @@ let compute_first_inversion_scheme env sigma ind sort dep_option =
                ((mkVar id)::revargs, Context.Named.add d hyps)
              else
                (revargs,hyps))
-          env ~init:([],[])
+          env ~init:([],Context.Named.empty)
       in
       let pty = it_mkNamedProd_or_LetIn sigma (mkSort sort) ownsign in
       let goal = mkArrow i ERelevance.relevant (applist(mkVar p, List.rev revargs)) in
@@ -288,7 +288,7 @@ let lemInvIn id c ids =
       else
         (tclTHEN (tclDO nb_of_new_hyp intro) (intros_replacing ids))
     in
-    ((tclTHEN (tclTHEN (Generalize.bring_hyps hyps) (lemInv id c))
+    ((tclTHEN (tclTHEN (Generalize.bring_hyps (Context.Named.of_list hyps)) (lemInv id c))
         (intros_replace_ids)))
   end
 

@@ -1402,7 +1402,7 @@ let rec glob_of_pat
       let EvarInfo evi = Evd.find sigma evk in
       let hyps = Evd.evar_filtered_context evi in
       let map decl pat = NamedDecl.get_id decl, pat in
-      let l = List.filter filter @@ List.map2 map hyps l in
+      let l = List.filter filter @@ List.map2 map (Context.Named.to_list hyps) l in
       let id = match Evd.evar_ident evk sigma with
       | None -> "__"
       | Some id -> Libnames.string_of_path id

@@ -222,7 +222,7 @@ let infoH ~pstate (tac : raw_tactic_expr) : unit =
     try snd @@ Declare.Proof.get_goal_context pstate 1
     with Proof.NoSuchGoal _ -> Global.env ()
   in
-  let oldhyps = List.map Context.Named.Declaration.get_id @@ Environ.named_context oldhyps in
+  let oldhyps = Context.Named.to_list_map Context.Named.Declaration.get_id @@ Environ.named_context oldhyps in
   let tac = Tacinterp.interp tac in
   let tac =
     let open Proofview.Notations in
@@ -232,7 +232,7 @@ let infoH ~pstate (tac : raw_tactic_expr) : unit =
     let map gl =
       let gl = Proofview_monad.drop_state gl in
       let hyps = Evd.evar_filtered_context (Evd.find_undefined sigma gl) in
-      List.map Context.Named.Declaration.get_id @@ hyps
+      Context.Named.to_list_map Context.Named.Declaration.get_id hyps
     in
     let hyps = List.map map gls in
     let newhyps = List.map (fun hypl -> List.subtract Names.Id.equal hypl oldhyps) hyps in

@@ -270,10 +270,10 @@ let find_cut _ ist =
             (fun _ -> Tactics.convert dom typ <*> Proofview.tclUNIT (f, arg, codom))
       | _ -> find_fun hyps
     in
-    Proofview.tclOR (Proofview.tclUNIT () >>= fun () -> find_arg hyps) (fun _ -> find_fun hyps0)
+    Proofview.tclOR (Proofview.tclUNIT () >>= fun () -> find_arg hyps) (fun _ -> find_fun (Context.Named.to_list hyps0))
   in
   let tac =
-    find_arg hyps0 >>= fun (f, arg, t) ->
+    find_arg (Context.Named.to_list hyps0) >>= fun (f, arg, t) ->
     Tacinterp.Value.apply k [val_of_id f; val_of_id arg; Value.of_constr t]
   in
   Proofview.tclONCE tac

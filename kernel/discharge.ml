@@ -70,7 +70,7 @@ let cook_constant _env info cb =
   in
   let typ = abstract_as_type cache cb.const_type in
   let names = names_info info in
-  let hyps = List.filter (fun d -> not (Id.Set.mem (NamedDecl.get_id d) names)) cb.const_hyps in
+  let hyps = Context.Named.filter (fun d -> not (Id.Set.mem (NamedDecl.get_id d) names)) cb.const_hyps in
   {
     const_hyps = hyps;
     const_univ_hyps = univ_hyps;
@@ -172,7 +172,7 @@ let cook_inductive info mib =
   let mind_packets = Array.map (cook_one_ind info cache ~params:mib.mind_params_ctxt ~ntypes) mib.mind_packets in
   let names = names_info info in
   let mind_hyps =
-    List.filter (fun d -> not (Id.Set.mem (NamedDecl.get_id d) names))
+    Context.Named.filter (fun d -> not (Id.Set.mem (NamedDecl.get_id d) names))
       mib.mind_hyps
   in
   let mind_variance, mind_sec_variance =

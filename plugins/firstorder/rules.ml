@@ -48,7 +48,7 @@ let wrap ~flags n b continue seq =
                 (aux (i-1) q (nd::ctx))
             else
               add_formula ~flags ~hint:false env sigma (GlobRef.VarRef id) (NamedDecl.get_type nd) (aux (i-1) q (nd::ctx)) in
-  let seq1=aux n nc [] in
+  let seq1=aux n (Context.Named.to_list nc) [] in
   let seq2 =
     if b then add_concl ~flags env sigma concl seq1 else seq1
   in
@@ -76,7 +76,7 @@ let find_hyp ~flags seq env sigma typ =
       if EConstr.eq_constr sigma t typ then Some (sigma, id)
       else find conv rest
   in
-  let hyps = EConstr.named_context env in
+  let hyps = Context.Named.to_list (EConstr.named_context env) in
   match find false hyps with
   | Some ans -> Some ans
   | None -> find true hyps

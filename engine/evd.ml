@@ -242,7 +242,7 @@ let evar_body evi = evi.evar_body
 let evar_context evi = named_context_of_val evi.evar_hyps
 
 let evar_filtered_context evi =
-  Filter.filter_list (evar_filter evi) (evar_context evi)
+  Context.Named.of_list (Filter.filter_list (evar_filter evi) (Context.Named.to_list (evar_context evi)))
 
 let evar_candidates evi = match evi.evar_candidates with
 | Undefined c -> c
@@ -265,7 +265,7 @@ let evar_filtered_hyps evi = match Filter.repr (evar_filter evi) with
     push_named_context_val decl hyps
   | _ -> instance_mismatch ()
   in
-  make_hyps filter (evar_context evi)
+  make_hyps filter (Context.Named.to_list (evar_context evi))
 
 let evar_env env evi =
   Environ.reset_with_named_context evi.evar_hyps env
@@ -274,7 +274,7 @@ let evar_filtered_env env evi = Environ.reset_with_named_context (evar_filtered_
 
 let evar_identity_subst evi =
   let len = match Filter.repr evi.evar_filter with
-  | None -> List.length @@ Environ.named_context_of_val evi.evar_hyps
+  | None -> Context.Named.length @@ Environ.named_context_of_val evi.evar_hyps
   | Some f -> List.count (fun b -> b) f
   in
   SList.defaultn len SList.empty
@@ -539,9 +539,9 @@ let replace_vars sigma var_alist x =
       else Constr.mkEvar (evk, args')
     | _ -> Constr.map_with_binders succ substrec n c
 
-    and substrec_instance n ctx args = match ctx, SList.view args with
-    | [], None -> SList.empty
-    | decl :: ctx, Some (c, args) ->
+    and substrec_instance n ctx args = match Context.Named.uncons ctx, SList.view args with
+    | None, None -> SList.empty
+    | Some (decl, ctx'), Some (c, args') ->
       let c' = match c with
       | None ->
         begin match find_var (NamedDecl.get_id decl) var_alist with
@@ -553,8 +553,8 @@ let replace_vars sigma var_alist x =
         if isVarId (NamedDecl.get_id decl) c' then None
         else Some c'
       in
-      SList.cons_opt c' (substrec_instance n ctx args)
-    | _ :: _, None | [], Some _ -> instance_mismatch ()
+      SList.cons_opt c' (substrec_instance n ctx' args')
+    | Some _, None | None, Some _ -> instance_mismatch ()
     in
     substrec 0 x
 
@@ -566,11 +566,11 @@ let instantiate_evar_array sigma info c args =
 
 let expand_existential sigma (evk, args) =
   let EvarInfo evi = find sigma evk in
-  let rec expand ctx args = match ctx, SList.view args with
-  | [], None -> []
-  | _ :: ctx, Some (Some c, args) -> c :: expand ctx args
-  | decl :: ctx, Some (None, args) -> mkVar (NamedDecl.get_id decl) :: expand ctx args
-  | [], Some _ | _ :: _, None -> instance_mismatch ()
+  let rec expand ctx args = match Context.Named.uncons ctx, SList.view args with
+  | None, None -> []
+  | Some (decl, ctx), Some (Some c, args) -> c :: expand ctx args
+  | Some (decl, ctx), Some (None, args) -> mkVar (NamedDecl.get_id decl) :: expand ctx args
+  | None, Some _ | Some _, None -> instance_mismatch ()
   in
   expand (evar_filtered_context evi) args
 
@@ -779,7 +779,7 @@ let mkLEvar sigma (evk, args) =
     if isVarId (NamedDecl.get_id decl) arg then SList.default accu
     else SList.cons arg accu
   in
-  let args = List.fold_right2 fold (evar_filtered_context evi) args SList.empty in
+  let args = List.fold_right2 fold (Context.Named.to_list (evar_filtered_context evi)) args SList.empty in
   mkEvar (evk, args)
 
 let is_relevance_irrelevant sigma r =
@@ -1636,15 +1636,15 @@ let expand0 sigma h c =
       if isVarId (NamedDecl.get_id decl) c then SList.default args
       else SList.cons c args
     in
-    let rec expand ctx args = match ctx, SList.view args with
-    | [], None -> SList.empty
-    | decl :: ctx, Some (Some c, args) ->
+    let rec expand ctx args = match Context.Named.uncons ctx, SList.view args with
+    | None, None -> SList.empty
+    | Some (decl, ctx), Some (Some c, args) ->
       let c = aux h c in
       push decl c (expand ctx args)
-    | decl :: ctx, Some (None, args) ->
+    | Some (decl, ctx), Some (None, args) ->
       let c = aux h (mkVar (NamedDecl.get_id decl)) in
       push decl c (expand ctx args)
-    | [], Some _ | _ :: _, None -> instance_mismatch ()
+    | None, Some _ | Some _, None -> instance_mismatch ()
     in
     let args = expand (evar_filtered_context evi) args in
     mkEvar (evk, args)
@@ -1659,23 +1659,23 @@ let expand sigma h c =
 let expand_instance ~skip (evi : undefined evar_info) h (args : Constr.t SList.t) =
   if skip && Id.Map.is_empty h.h_clos.evc_map then args
   else
-    let rec expand ctx args = match ctx, SList.view args with
-    | [], None -> SList.empty
-    | decl :: ctx, Some (None, args) ->
-      let args = expand ctx args in
+    let rec expand ctx args = match Context.Named.uncons ctx, SList.view args with
+    | None, None -> SList.empty
+    | Some (decl, ctx'), Some (None, args) ->
+      let args = expand ctx' args in
       let id = NamedDecl.get_id decl in
       if Id.Map.mem id h.h_clos.evc_map then
         (* Keep the non-default representation as kind will expand it *)
         SList.cons (mkVar id) args
       else if skip then SList.default args
       else SList.cons (mkVar id) args
-    | decl :: ctx, Some (Some c, args) ->
-      let args = expand ctx args in
+    | Some (decl, ctx'), Some (Some c, args) ->
+      let args = expand ctx' args in
       let id = NamedDecl.get_id decl in
       (* Same as above *)
       if skip && isVarId id c && not (Id.Map.mem id h.h_clos.evc_map) then SList.default args
       else SList.cons c args
-    | [], Some _ | _ :: _, None -> instance_mismatch ()
+    | Some _, None | None, Some _ -> instance_mismatch ()
     in
     expand (evar_filtered_context evi) args
 
@@ -1801,9 +1801,9 @@ module MiniEConstr = struct
             if args' == args then c else mkEvar (evk, args')
           else raise Not_found
         | Some evi ->
-          let rec inst ctx args = match ctx, SList.view args with
-          | [], None -> SList.empty
-          | decl :: ctx, Some (c, args) ->
+          let rec inst ctx args = match Context.Named.uncons ctx, SList.view args with
+          | None, None -> SList.empty
+          | Some (decl, ctx'), Some (c, args) ->
             let c = match c with
             | None ->
               let c = find clos (NamedDecl.get_id decl) in
@@ -1813,8 +1813,8 @@ module MiniEConstr = struct
               else c
             | Some c -> Some (self clos c)
             in
-            SList.cons_opt c (inst ctx args)
-          | _ :: _, None | [], Some _ -> instance_mismatch ()
+            SList.cons_opt c (inst ctx' args)
+          | Some _, None | None, Some _ -> instance_mismatch ()
           in
           let args' = inst (evar_filtered_context evi) args in
           if args == args' then c else mkEvar (evk, args')

@@ -164,3 +164,5 @@ bin
 /theories/Corelib/dune
 /theories/Ltac2/dune
 /test-suite/test_suite_config.inc
+.claude/worktrees/
+.claude/worktrees/

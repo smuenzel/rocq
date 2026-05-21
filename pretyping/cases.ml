@@ -1805,7 +1805,7 @@ let abstract_tycon ?loc env sigma subst tycon extenv t =
       let rel_filter = List.map map inst in
       let named_filter =
         List.map (fun d -> local_occur_var sigma (NamedDecl.get_id d) u)
-          (named_context !!extenv) in
+          (Context.Named.to_list (named_context !!extenv)) in
       let filter = Filter.make (rel_filter @ named_filter) in
       let candidates = List.rev (u :: List.map mkRel vl) in
       let sigma, ev = Evarutil.new_evar !!extenv ~src ~filter ~candidates ~typeclass_candidate:false sigma ty in

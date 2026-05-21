@@ -77,7 +77,7 @@ let handle h (Libobject.Dyn.Dyn (tag, o)) = match DynHandle.find tag h with
 
 (* General search over declarations *)
 let generic_search env sigma (fn : GlobRef.t -> Decls.logical_kind option -> env -> Evd.evar_map -> constr -> unit) =
-  List.iter (fun d -> fn (GlobRef.VarRef (NamedDecl.get_id d)) None env sigma (NamedDecl.get_type d))
+  Context.Named.iter_decl (fun d -> fn (GlobRef.VarRef (NamedDecl.get_id d)) None env sigma (NamedDecl.get_type d))
     (Environ.named_context env);
   let iter_obj prefix lobj = match lobj with
     | AtomicObject o ->

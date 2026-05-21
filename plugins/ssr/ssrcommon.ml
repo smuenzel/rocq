@@ -310,7 +310,7 @@ let max_suffix m (t, j0 as tj0) id  =
 
 (** creates a fresh (w.r.t. `gl_ids` and internal names) inaccessible name of the form _tXX_ *)
 let mk_anon_id t gl_ids =
-  let gl_ids = List.map NamedDecl.get_id (EConstr.named_context_of_val gl_ids) in
+  let gl_ids = Context.Named.to_list_map NamedDecl.get_id (EConstr.named_context_of_val gl_ids) in
   let m, si0, id0 =
     let s = ref (Printf.sprintf  "‗%s‗" t) in
     if is_internal_name !s then s := "‗" ^ !s;
@@ -393,7 +393,7 @@ let ssrevaltac ist gtac = Tacinterp.tactic_of_value ist gtac
 (* but stripping global ones. We use the variable names to encode the    *)
 (* the number of dependencies, so that the transformation is reversible. *)
 
-let env_size env = List.length (Environ.named_context env)
+let env_size env = Context.Named.length (Environ.named_context env)
 
 let resolve_typeclasses env sigma ~where ~fail =
   let filter =
@@ -409,7 +409,7 @@ let abs_evars env sigma0 ?(rigid = []) (sigma, c0) =
     let open EConstr in
     let evi = Evd.find_undefined sigma k in
     let concl = Evd.evar_concl evi in
-    let dc = CList.firstn n (evar_filtered_context evi) in
+    let dc = Context.Named.firstn n (evar_filtered_context evi) in
     let abs_dc c = function
     | NamedDecl.LocalDef (x,b,t) -> mkNamedLetIn sigma x b t (mkArrow t x.binder_relevance c)
     | NamedDecl.LocalAssum (x,t) -> mkNamedProd sigma x t c in
@@ -476,7 +476,7 @@ let abs_evars_pirrel env sigma0 (sigma, c0) =
     let open EConstr in
     let evi = Evd.find_undefined sigma k in
     let concl = Evd.evar_concl evi in
-    let dc = CList.firstn n (evar_filtered_context evi) in
+    let dc = Context.Named.firstn n (evar_filtered_context evi) in
     let abs_dc c = function
     | NamedDecl.LocalDef (x,b,t) -> mkNamedLetIn sigma x b t (mkArrow t x.binder_relevance c)
     | NamedDecl.LocalAssum (x,t) -> mkNamedProd sigma x t c in

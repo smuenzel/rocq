@@ -526,9 +526,9 @@ let record_aux env s_ty s_bo =
     String.concat " "
       (CList.map_filter (fun decl ->
           let id = NamedDecl.get_id decl in
-          if List.exists (NamedDecl.get_id %> Id.equal id) in_ty then None
+          if Context.Named.exists (NamedDecl.get_id %> Id.equal id) in_ty then None
           else Some (Id.to_string id))
-        (keep_hyps env s_bo)) in
+        (Context.Named.to_list (keep_hyps env s_bo))) in
   Aux_file.record_in_aux "context_used" v
 
 let cast_pure_proof_entry (e : Constr.constr pproof_entry) =
@@ -550,7 +550,7 @@ let section_context_of_opaque_proof_entry (type a b) (entry : (a, b) effect_entr
   let open Environ in
   let env = Global.env () in
   let hyp_typ, hyp_def =
-    if List.is_empty (Environ.named_context env) then
+    if Context.Named.is_empty (Environ.named_context env) then
       Id.Set.empty, Id.Set.empty
     else
       let ids_typ = global_vars_set env typ in
@@ -919,7 +919,7 @@ let register_definition_scheme ~internal ~name ~const:kn ~univs ?loc () =
 let declare_entry ~loc ~name ?(scope=Locality.default_scope) ?(clearbody=false) ~kind ~typing_flags ~user_warns ?hook ?(obls=[]) ~impargs ~uctx entry =
   let should_suggest =
     ProofEntry.get_opacity entry
-    && not (List.is_empty (Global.named_context()))
+    && not (Context.Named.is_empty (Global.named_context()))
     && Option.is_empty entry.proof_entry_secctx
   in
   let dref = match scope with
@@ -1828,11 +1828,11 @@ let has_late_init ps = ps.has_late_init
 
 let initialize_named_context_for_proof () =
   let sign = Global.named_context () in
-  List.fold_right
+  Context.Named.fold_outside
     (fun d signv ->
       let id = NamedDecl.get_id d in
       let d = if Decls.variable_opacity id then NamedDecl.drop_body d else d in
-      Environ.push_named_context_val d signv) sign Environ.empty_named_context_val
+      Environ.push_named_context_val d signv) sign ~init:Environ.empty_named_context_val
 
 let start_proof_core ~name ~pinfo ?using sigma goals =
   (* In ?sign, we remove the bodies of variables in the named context
@@ -1930,7 +1930,7 @@ let start_mutual_definitions ~info ~cinfo ~bodies ~possible_guard ?using sigma =
       let ntn_env =
         (* We simulate the goal context in which the fixpoint bodies have to be proved (exact relevance does not matter) *)
         let make_decl CInfo.{name; typ} = Context.Named.Declaration.LocalAssum (Context.annotR name, typ) in
-        Environ.push_named_context (List.map make_decl cinfo) (Global.env()) in
+        Environ.push_named_context (Context.Named.of_list_map make_decl cinfo) (Global.env()) in
       List.iter (Metasyntax.add_notation_interpretation ~local:(info.scope=Locality.Discharge) ntn_env) info.ntns in
     lemma
 
@@ -1971,7 +1971,7 @@ let start_mutual_definitions_refine ~info ~cinfo ~bodies ~possible_guard ?using 
       let ntn_env =
         (* We simulate the goal context in which the fixpoint bodies have to be proved (exact relevance does not matter) *)
         let make_decl CInfo.{name; typ} = Context.Named.Declaration.LocalAssum (Context.annotR name, EConstr.Unsafe.to_constr typ) in
-        Environ.push_named_context (List.map make_decl cinfo) (Global.env()) in
+        Environ.push_named_context (Context.Named.of_list_map make_decl cinfo) (Global.env()) in
       List.iter (Metasyntax.add_notation_interpretation ~local:(info.scope=Locality.Discharge) ntn_env) info.ntns in
     lemma
 
@@ -1984,7 +1984,7 @@ let set_used_variables ps ~using =
   let env = Global.env () in
   let ctx = Environ.keep_hyps env using in
   let ctx_set =
-    List.fold_right Id.Set.add (List.map NamedDecl.get_id ctx) Id.Set.empty in
+    Context.Named.fold_outside (fun decl -> Id.Set.add (NamedDecl.get_id decl)) ctx ~init:Id.Set.empty in
   let vars_of = Environ.global_vars_set in
   let aux env entry (ctx, all_safe as orig) =
     match entry with
@@ -1995,7 +1995,7 @@ let set_used_variables ps ~using =
        if Id.Set.mem x all_safe then orig else
        let vars = Id.Set.union (vars_of env bo) (vars_of env ty) in
        if Id.Set.subset vars all_safe
-       then (decl :: ctx, Id.Set.add x all_safe)
+       then (Context.Named.add decl ctx, Id.Set.add x all_safe)
        else (ctx, all_safe) in
   let ctx, _ =
     Environ.fold_named_context aux env ~init:(ctx,ctx_set) in

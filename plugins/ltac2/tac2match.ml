@@ -227,7 +227,7 @@ end
 let match_goal env sigma concl ~rev rule =
   let open Proofview.Notations in
   let hyps = EConstr.named_context env in
-  let hyps = if rev then List.rev hyps else hyps in
+  let hyps = if rev then Context.Named.to_list_rev hyps else Context.Named.to_list hyps in
   let module E = struct
     let env = env
     let sigma = sigma

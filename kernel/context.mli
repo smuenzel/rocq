@@ -347,6 +347,9 @@ sig
     (** Map the identifier bound by a given declaration. *)
     val map_id : (Id.t -> Id.t) -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
 
+    (** Map the relevance *)
+    val map_relevance : ('r -> 'r) -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
     (** For local assumptions, this function returns the original local assumptions.
         For local definitions, this function maps the value in the local definition. *)
     val map_value : ('c -> 'c) -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
@@ -387,16 +390,59 @@ sig
   (** Named-context is represented as a list of declarations.
       Inner-most declarations are at the beginning of the list.
       Outer-most declarations are at the end of the list. *)
-  type ('constr, 'types, 'r) pt = ('constr, 'types, 'r) Declaration.pt list
+  type ('constr, 'types, 'r) pt
+
+  (** Conversion to and from the underlying list representation. *)
+  val to_list : ('c, 't, 'r) pt -> ('c, 't, 'r) Declaration.pt list
+  val of_list : ('c, 't, 'r) Declaration.pt list -> ('c, 't, 'r) pt
+  val of_list_map : ('a -> ('c, 't, 'r) Declaration.pt) -> 'a list -> ('c, 't, 'r) pt
+
+  val to_list_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
+  val to_list_rev_map : (('c, 't, 'r) Declaration.pt -> 'a) -> ('c, 't, 'r) pt -> 'a list
+
+  val to_list_rev : ('c, 't, 'r) pt -> ('c, 't, 'r) Declaration.pt list
+
+  val to_list_until : (('c, 't, 'r) Declaration.pt -> 'a option) ->
+    ('c, 't, 'r) pt -> 'a list * ('c, 't, 'r) pt
+
+  val to_list_map_i : (int -> ('c, 't, 'r) Declaration.pt -> 'a) -> int -> ('c, 't, 'r) pt -> 'a list
+
+  val uncons : ('c, 't, 'r) pt -> (('c, 't, 'r) Declaration.pt * ('c, 't, 'r) pt) option
 
   (** empty named-context *)
   val empty : ('c, 't, 'r) pt
 
+  (** Check whether a named-context is empty *)
+  val is_empty : ('c, 't, 'r) pt -> bool
+
+  val init : int -> (int -> ('c, 't, 'r) Declaration.pt) -> ('c, 't, 'r) pt
+
   (** Return a new named-context enriched by with a given inner-most declaration. *)
   val add : ('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
 
+  (** Concatenate two named-contexts. *)
+  val append : ('c, 't, 'r) pt -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Reverse the order of declarations. *)
+  val rev : ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Return the first [n] (innermost) declarations. *)
+  val firstn : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Skip the first [n] (innermost) declarations. *)
+  val skipn : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  val sep_last : ('c, 't, 'r) pt -> ('c, 't, 'r) Declaration.pt * ('c, 't, 'r) pt
+
+  val nth : ('c, 't, 'r) pt -> int -> ('c, 't, 'r) Declaration.pt
+
+  val hd : ('c, 't, 'r) pt -> ('c, 't, 'r) Declaration.pt
+
   (** Return the number of {e local declarations} in a given named-context. *)
   val length : ('c, 't, 'r) pt -> int
+
+  (** Return the number of {e local assumptions} in a given named-context. *)
+  val nhyps : ('c, 't, 'r) pt -> int
 
   (** Return a declaration designated by an identifier of the variable bound in that declaration.
       @raise Not_found if the designated identifier is not bound in a given named-context. *)
@@ -409,28 +455,87 @@ sig
   (** Map all terms in a given named-context. *)
   val map : ('c -> 'c) -> ('c, 'c, 'r) pt -> ('c, 'c, 'r) pt
 
-  (** Map all terms in a given rel-context. *)
+  (** Map all terms in a given named-context. *)
   val map_with_relevance : ('r -> 'r) -> ('c -> 'c) -> ('c, 'c, 'r) pt -> ('c, 'c, 'r) pt
+
+  val map_relevance : ('r -> 'r) -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt
 
   (** Map all terms in a given named-context. *)
   val map_het : ('r1 -> 'r2) -> ('c -> 'd) -> ('c, 'c, 'r1) pt -> ('d, 'd, 'r2) pt
 
+  (** Map all terms in a given named-context taking into account the
+      position of the binder in the context starting at 1. *)
+  val map_with_binders : (int -> 'c -> 'c) -> ('c, 'c, 'r) pt -> ('c, 'c, 'r) pt
+
+  (** Map a function over each declaration in the context. *)
+  val map_decl : (('c1, 't1, 'r1) Declaration.pt -> ('c2, 't2, 'r2) Declaration.pt) ->
+    ('c1, 't1, 'r1) pt -> ('c2, 't2, 'r2) pt
+
+  val map_decl_i : (int -> ('c1, 't1, 'r1) Declaration.pt -> ('c2, 't2, 'r2) Declaration.pt) ->
+    int -> ('c1, 't1, 'r1) pt -> ('c2, 't2, 'r2) pt
+
+  val map_decl2 : ('a -> ('c1, 't1, 'r1) Declaration.pt -> ('c2, 't2, 'r2) Declaration.pt) ->
+    'a list -> ('c1, 't1, 'r1) pt -> ('c2, 't2, 'r2) pt
+
+  (** Like {!map_decl} but returns the original context unchanged if no
+      declaration is modified (checked via physical equality). *)
+  val map_decl_smart : (('c, 't, 'r) Declaration.pt -> ('c, 't, 'r) Declaration.pt) ->
+    ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Keep only declarations satisfying a predicate. *)
+  val filter : (('c, 't, 'r) Declaration.pt -> bool) ->
+    ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  (** Check whether all declarations satisfy a predicate. *)
+  val for_all : (('c, 't, 'r) Declaration.pt -> bool) ->
+    ('c, 't, 'r) pt -> bool
+
+  val for_all_i : (int -> ('c, 't, 'r) Declaration.pt -> bool) -> int ->
+    ('c, 't, 'r) pt -> bool
+
+  (** Check whether any declaration satisfies a predicate. *)
+  val exists : (('c, 't, 'r) Declaration.pt -> bool) ->
+    ('c, 't, 'r) pt -> bool
+
   (** Perform a given action on every declaration in a given named-context. *)
   val iter : ('c -> unit) -> ('c, 'c, 'r) pt -> unit
+
+  (** Perform an action on each declaration. *)
+  val iter_decl : (('c, 't, 'r) Declaration.pt -> unit) -> ('c, 't, 'r) pt -> unit
+
+  val count : (('c, 't, 'r) Declaration.pt -> bool) -> ('c, 't, 'r) pt -> int
 
   (** Reduce all terms in a given named-context to a single value.
       Innermost declarations are processed first. *)
   val fold_inside : ('a -> ('c, 't, 'r) Declaration.pt -> 'a) -> init:'a -> ('c, 't, 'r) pt -> 'a
 
+  val fold_inside_i : (int -> 'a -> ('c, 't, 'r) Declaration.pt -> 'a) -> int -> init:'a -> ('c, 't, 'r) pt -> 'a
+
   (** Reduce all terms in a given named-context to a single value.
       Outermost declarations are processed first. *)
   val fold_outside : (('c, 't, 'r) Declaration.pt -> 'a -> 'a) -> ('c, 't, 'r) pt -> init:'a -> 'a
 
+  val fold_outside2 : ('a -> ('c, 't, 'r) Declaration.pt -> 'b -> 'b) -> 'a list -> ('c, 't, 'r) pt -> init:'b -> 'b
+
+  val fold_outside_map : (('c, 't, 'r) Declaration.pt -> 'a -> ('c, 't, 'r) Declaration.pt * 'a) -> ('c, 't, 'r) pt -> init:'a -> ('c, 't, 'r) pt * 'a
+
   (** Return the set of all identifiers bound in a given named-context. *)
   val to_vars : ('c, 't, 'r) pt -> Id.Set.t
 
+  (** Map a given named-context to a list where each {e local
+      definition} is mapped to [true] and each {e local assumption} is
+      mapped to [false]. The resulting list is in reverse order
+      compared to the order of declarations in the context. *)
+  val to_tags : ('c, 't, 'r) pt -> bool list
+
   (** Turn all [LocalDef] into [LocalAssum], leave [LocalAssum] unchanged. *)
   val drop_bodies : ('c, 't, 'r) pt -> ('c, 't, 'r) pt
+
+  val chop : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt * ('c, 't, 'r) pt
+
+  val chop_nhyps : int -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt * ('c, 't, 'r) pt
+
+  val split_when : (('c, 't, 'r) Declaration.pt -> bool) -> ('c, 't, 'r) pt -> ('c, 't, 'r) pt * ('c, 't, 'r) pt
 
   (** [to_instance Ω] builds an instance [args] in reverse order such
       that [Ω ⊢ args:Ω] where [Ω] is a named-context and with the local

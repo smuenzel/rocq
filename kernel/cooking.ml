@@ -88,7 +88,7 @@ type cooking_info = {
 let empty_cooking_info = {
   expand_info = (Cmap_env.empty, Mindmap_env.empty);
   abstr_info = {
-      abstr_ctx = [];
+      abstr_ctx = Context.Named.empty;
       abstr_auctx = AbstractContext.empty;
       abstr_ausubst = Instance.empty;
     };
@@ -133,21 +133,22 @@ let instantiate_my_gr gr u =
 
 let discharge_inst top_abst_subst sub_abst_rev_inst =
   let rec aux k relargs top_abst_subst sub_abst_rev_inst =
-    match top_abst_subst, sub_abst_rev_inst with
-    | decl :: top_abst_subst, id' :: sub_abst_rev_inst' ->
+    match Context.Named.uncons top_abst_subst, sub_abst_rev_inst with
+    | Some (decl, rest), id' :: ids ->
       if Id.equal (NamedDecl.get_id decl) id' then
-        aux (k+1) (k :: relargs) top_abst_subst sub_abst_rev_inst'
+        aux (k+1) (k :: relargs) rest ids
       else
-        aux (k+1) relargs top_abst_subst sub_abst_rev_inst
+        aux (k+1) relargs rest sub_abst_rev_inst
     | _, [] -> relargs
-    | [], _ -> assert false in
+    | None, _ -> assert false in
   aux 1 [] top_abst_subst sub_abst_rev_inst
 
-let rec find_var k id = function
-| [] -> raise Not_found
-| decl :: subst ->
-  if Id.equal id (NamedDecl.get_id decl) then k+1
-  else find_var (k+1) id subst
+let rec find_var k id ctx =
+  match Context.Named.uncons ctx with
+  | None -> raise Not_found
+  | Some (decl, rest) ->
+    if Id.equal id (NamedDecl.get_id decl) then k+1
+    else find_var (k+1) id rest
 
 let share cache top_abst_subst r (cstl,knl) =
   try RefTable.find cache r
@@ -170,7 +171,7 @@ let share_univs cache top_abst_subst k r u l =
   mkApp (instantiate_my_gr r (Instance.append abstr_uinst u), make_inst k abstr_inst_rel)
 
 let discharge_proj_repr r p = (* To merge with discharge_proj *)
-  let nnewpars = List.count NamedDecl.is_local_assum r.abstr_info.abstr_ctx in
+  let nnewpars = Context.Named.count NamedDecl.is_local_assum r.abstr_info.abstr_ctx in
   let map npars = npars + nnewpars in
   Projection.Repr.map_npars map p
 
@@ -232,7 +233,7 @@ let expand_constr cache modlist top_abst_subst c =
   | _ -> Constr.map_with_binders succ substrec k c
 
   in
-  if is_empty_modlist modlist && List.is_empty top_abst_subst then c
+  if is_empty_modlist modlist && Context.Named.is_empty top_abst_subst then c
   else substrec 0 c
 
 (** Cooking is made of 4 steps:
@@ -274,15 +275,16 @@ let abstract_as_sort cache s =
 let abstract_named_context expand_info abstr_ausubst hyps =
   let fold decl abstr_ctx =
     let cache = RefTable.create 13 in
+    let ctx = Context.Named.of_list abstr_ctx in
     let decl = match decl with
     | NamedDecl.LocalDef (id, b, t) ->
       let id = Context.map_annot_relevance (UVars.subst_sort_level_relevance (make_instance_subst abstr_ausubst)) id in
-      let b = expand_subst0 cache expand_info abstr_ctx abstr_ausubst b in
-      let t = expand_subst0 cache expand_info abstr_ctx abstr_ausubst t in
+      let b = expand_subst0 cache expand_info ctx abstr_ausubst b in
+      let t = expand_subst0 cache expand_info ctx abstr_ausubst t in
       NamedDecl.LocalDef (id, b, t)
     | NamedDecl.LocalAssum (id, t) ->
       let id = Context.map_annot_relevance (UVars.subst_sort_level_relevance (make_instance_subst abstr_ausubst)) id in
-      let t = expand_subst0 cache expand_info abstr_ctx abstr_ausubst t in
+      let t = expand_subst0 cache expand_info ctx abstr_ausubst t in
       NamedDecl.LocalAssum (id, t)
     in
     decl :: abstr_ctx
@@ -323,8 +325,7 @@ let make_cooking_info ~recursive expand_info hyps uctx =
   info, abstr_inst_info
 
 let names_info info =
-  let fold accu id = Id.Set.add (NamedDecl.get_id id) accu in
-  List.fold_left fold Id.Set.empty info.abstr_info.abstr_ctx
+  Context.Named.fold_inside (fun accu id -> Id.Set.add (NamedDecl.get_id id) accu) ~init:Id.Set.empty info.abstr_info.abstr_ctx
 
 let rel_context_of_cooking_cache cache =
   Lazy.force cache.rel_ctx

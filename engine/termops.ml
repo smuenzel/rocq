@@ -193,8 +193,8 @@ let pr_evar_info (type a) env sigma (evi : a Evd.evar_info) =
   let phyps =
     try
       let decls = match Filter.repr (evar_filter evi) with
-      | None -> List.map (fun c -> (c, true)) (evar_context evi)
-      | Some filter -> List.combine (evar_context evi) filter
+      | None -> Context.Named.to_list_map (fun c -> (c, true)) (evar_context evi)
+      | Some filter -> List.combine (Context.Named.to_list (evar_context evi)) filter
       in
       prlist_with_sep spc (pr_decl env sigma) (List.rev decls)
     with Invalid_argument _ -> str "Ill-formed filtered context" in
@@ -290,7 +290,7 @@ let print_env_short env sigma =
                                   ++ print_constr env sigma (EConstr.of_constr b) ++ str ")"
   in
   let pr_named_decl = NamedDecl.to_rel_decl %> pr_rel_decl in
-  let nc = List.rev (named_context env) in
+  let nc = Context.Named.to_list_rev (named_context env) in
   let rc = Context.Rel.to_list (Context.Rel.rev (rel_context env)) in
     str "[" ++ pr_sequence pr_named_decl nc ++ str "]" ++ spc () ++
     str "[" ++ pr_sequence pr_rel_decl rc ++ str "]"
@@ -451,7 +451,7 @@ let lookup_rel_id id sign =
   lookrec 1 (Context.Rel.to_list sign)
 
 (* On Constr *)
-let it_named_context_quantifier f ~init = List.fold_left (fun c d -> f d c) init
+let it_named_context_quantifier f ~init ctx = Context.Named.fold_inside (fun c d -> f d c) ~init ctx
 let it_mkNamedProd_wo_LetIn init = it_named_context_quantifier mkNamedProd_wo_LetIn ~init
 
 let it_mkLambda_or_LetIn_from_no_LetIn c decls =
@@ -1176,7 +1176,7 @@ let map_rel_context_in_env f env sign =
   in
   aux env Context.Rel.empty (Context.Rel.rev sign)
 
-let fold_named_context_both_sides f l ~init = List.fold_right_and_left f l init
+let fold_named_context_both_sides f l ~init = List.fold_right_and_left f (Context.Named.to_list l) init
 
 let mem_named_context_val id ctxt =
   try ignore(Environ.lookup_named_ctxt id ctxt); true with Not_found -> false

@@ -152,12 +152,13 @@ let rec make_form env sigma atom_env term =
      end
   | _ -> make_atom atom_env (normalize term)
 
-let rec make_hyps env sigma atom_env lenv = function
-    [] -> []
-  | LocalDef (_,body,typ)::rest ->
+let rec make_hyps env sigma atom_env lenv ctx =
+  match Context.Named.uncons ctx with
+  | None -> []
+  | Some (LocalDef (_,body,typ), rest) ->
      make_hyps env sigma atom_env (typ::body::lenv) rest
-  | LocalAssum (id,typ)::rest ->
-     let hrec=
+  | Some (LocalAssum (id,typ), rest) ->
+     let hrec =
        make_hyps env sigma atom_env (typ::lenv) rest in
      if List.exists (fun c -> Termops.local_occur_var sigma id.binder_name c) lenv ||
           (not (Sorts.Quality.is_qprop (Retyping.get_sort_quality_of env sigma typ)))

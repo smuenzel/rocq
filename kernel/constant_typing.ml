@@ -30,7 +30,7 @@ module NamedDecl = Context.Named.Declaration
 let check_section_variables env declared_vars body typ =
   let env_ids = ids_of_named_context_val (named_context_val env) in
   Id.Set.iter (fun id -> if not (Id.Set.mem id env_ids) then Type_errors.error_unbound_var env id) declared_vars;
-  if List.is_empty (named_context env) then begin
+  if Context.Named.is_empty (named_context env) then begin
     assert (Id.Set.is_empty declared_vars);
     declared_vars
   end
@@ -48,7 +48,7 @@ let check_section_variables env declared_vars body typ =
   declared_vars
 
 let compute_section_variables env body typ =
-  if List.is_empty (named_context env) then
+  if Context.Named.is_empty (named_context env) then
     (* Empty section context: optimization *)
     Id.Set.empty
   else
@@ -65,7 +65,7 @@ let used_section_variables env declared_hyps body typ =
     | Some declared -> check_section_variables env declared body typ
   in
   (* Order the variables *)
-  List.filter (fun d -> Id.Set.mem (NamedDecl.get_id d) hyps) (Environ.named_context env)
+  Context.Named.filter (fun d -> Id.Set.mem (NamedDecl.get_id d) hyps) (Environ.named_context env)
 
 (* Insertion of constants and parameters in environment. *)
 
@@ -158,9 +158,9 @@ let infer_primitive env { prim_entry_type = utyp; prim_entry_content = p; } =
     | OT_const c -> Def (CPrimitives.body_of_prim_const c)
   in
   (* Primitives not allowed in sections (checked in safe_typing) *)
-  assert (List.is_empty (named_context env));
+  assert (Context.Named.is_empty (named_context env));
   {
-    const_hyps = [];
+    const_hyps = Context.Named.empty;
     const_univ_hyps = Instance.empty;
     const_body = body;
     const_type = typ;
@@ -177,7 +177,7 @@ let infer_symbol env { symb_entry_universes; symb_entry_unfold_fix; symb_entry_t
   let j = Typeops.infer env symb_entry_type in
   let r = Typeops.assumption_of_judgment env j in
   {
-    const_hyps = [];
+    const_hyps = Context.Named.empty;
     const_univ_hyps = Instance.empty;
     const_body = Symbol symb_entry_unfold_fix;
     const_type = j.uj_val;
@@ -290,7 +290,7 @@ let check_delayed (type a) (handle : a effect_handler) tyenv (body : a proof_out
     Typeops.check_cast eff_env j DEFAULTcast tyj
   in
   let declared =
-    if List.is_empty (named_context env) then declared
+    if Context.Named.is_empty (named_context env) then declared
     else Environ.really_needed env (Id.Set.union declared (global_vars_set env tyj.utj_val))
   in
   let declared' = check_section_variables env declared (Some body) tyj.utj_val in

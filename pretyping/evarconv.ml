@@ -1567,7 +1567,7 @@ let choose_less_dependent_instance evd term (evk, args) =
     if EConstr.eq_constr evd arg term then NamedDecl.get_id decl :: accu
     else accu
   in
-  let subst = get_subst [] (evar_filtered_context evi) args in
+  let subst = get_subst [] (Context.Named.to_list (evar_filtered_context evi)) args in
   match subst with
   | [] -> None
   | id :: _ -> Some (Evd.define evk (mkVar id) evd)
@@ -1703,7 +1703,7 @@ let check_selected_occs env sigma c occ occs =
 exception TypingFailed of evar_map
 
 let set_of_evctx l =
-  List.fold_left (fun s decl -> Id.Set.add (NamedDecl.get_id decl) s) Id.Set.empty l
+  Context.Named.fold_inside (fun s decl -> Id.Set.add (NamedDecl.get_id decl) s) ~init:Id.Set.empty l
 
 (** Weaken the existentials so that they can be typed in sign and raise
     an error if the term otherwise mentions variables not bound in sign. *)
@@ -1744,7 +1744,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
          str"evar env: " ++ Termops.Internal.print_env env_evar evd));
   let args = Evd.expand_existential evd (evk, args) in
   let args = List.map (nf_evar evd) args in
-  let argsubst = List.map2 (fun decl c -> (NamedDecl.get_id decl, c)) ctxt args in
+  let argsubst = List.map2 (fun decl c -> (NamedDecl.get_id decl, c)) (Context.Named.to_list ctxt) args in
   let rhs = nf_evar evd rhs in
   if not (noccur_evar env_rhs evd evk rhs) then raise (TypingFailed evd);
   (* Ensure that any progress made by Typing.e_solve_evars will not contradict
@@ -1766,7 +1766,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
       let c = nf_evar evd c in
       (* ty is in env_rhs now *)
       let ty = replace_vars evd argsubst t in
-      let filter' = filter_possible_projections evd i c (nf_evar evd ty) ctxt args in
+      let filter' = filter_possible_projections evd i c (nf_evar evd ty) (Context.Named.to_list ctxt) args in
       (id,t,c,ty,evs,Filter.make filter',occs) :: make_subst (i + 1) (ctxt',l,occsl)
     | _, _, [] -> []
     | _ -> anomaly (Pp.str "Signature or instance are shorter than the occurrences list.")
@@ -1822,7 +1822,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
      set_holes env_rhs' evd fixed rhs' subst
   | [] -> evd, fixed, rhs in
 
-  let subst = make_subst 0 (ctxt,args,argoccs) in
+  let subst = make_subst 0 (Context.Named.to_list ctxt, args, argoccs) in
 
   let evd, _, rhs' = set_holes env_rhs evd Evar.Set.empty rhs subst in
   let rhs' = nf_evar evd rhs' in

@@ -87,7 +87,7 @@ let subst_evar_constr evm evs n idf t =
           | _, _ -> acc
           (*failwith "subst_evars: invalid argument"*)
         in
-        aux hyps args []
+        aux (Context.Named.to_list hyps) args []
       in
       if
         List.exists
@@ -148,11 +148,11 @@ let etype_of_evar evm evs hyps concl =
       let t', s, trans = subst_evar_constr evm evs n EConstr.mkVar concl in
       (subst_vars acc 0 t', s, trans)
   in
-  aux [] 0 (List.rev hyps)
+  aux [] 0 (Context.Named.to_list_rev hyps)
 
 let trunc_named_context n ctx =
-  let len = List.length ctx in
-  CList.firstn (len - n) ctx
+  let len = Context.Named.length ctx in
+  Context.Named.firstn (len - n) ctx
 
 let rec chop_product n t =
   let pop t = Vars.lift (-1) t in

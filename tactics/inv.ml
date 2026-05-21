@@ -34,7 +34,7 @@ let var_occurs_in_pf gl id =
   let env = Proofview.Goal.env gl in
   let sigma = Proofview.Goal.sigma gl in
   occur_var env sigma id (Proofview.Goal.concl gl) ||
-  List.exists (occur_var_in_decl env sigma id) (Proofview.Goal.hyps gl)
+  Context.Named.exists (occur_var_in_decl env sigma id) (Proofview.Goal.hyps gl)
 
 (* [make_inv_predicate (ity,args) C]
 
@@ -300,7 +300,7 @@ let generalizeRewriteIntros as_mode tac depids id =
   Proofview.Goal.enter begin fun gl ->
   let env = Proofview.Goal.env gl in
   let sigma = Proofview.Goal.sigma gl in
-  let dids = dependent_hyps env0 env sigma id depids in
+  let dids = Context.Named.of_list (dependent_hyps env0 env sigma id depids) in
   let reintros = if as_mode then intros_replacing else intros_possibly_replacing in
   (tclTHENLIST
     [Generalize.bring_hyps dids; tac;
@@ -438,9 +438,9 @@ let rewrite_equations as_mode othin neqns names ba =
     | Some thin ->
         tclTHENLIST
             [tclDO neqns intro;
-             Generalize.bring_hyps nodepids;
-             clear (ids_of_named_context nodepids);
-             (nLastDecls neqns (fun ctx -> Generalize.bring_hyps (List.rev ctx)));
+             Generalize.bring_hyps (Context.Named.of_list nodepids);
+             clear (ids_of_named_context (Context.Named.of_list nodepids));
+             (nLastDecls neqns (fun ctx -> Generalize.bring_hyps (Context.Named.rev ctx)));
              (nLastDecls neqns (fun ctx -> clear (ids_of_named_context ctx)));
              tclMAP_i (true,false) neqns (fun (idopt,names) ->
                (tclTHEN
@@ -461,8 +461,8 @@ let rewrite_equations as_mode othin neqns names ba =
         else
           (tclTHENLIST
              [tclDO neqns intro;
-              Generalize.bring_hyps nodepids;
-              clear (ids_of_named_context nodepids)])
+              Generalize.bring_hyps (Context.Named.of_list nodepids);
+              clear (ids_of_named_context (Context.Named.of_list nodepids))])
   end
 
 let interp_inversion_kind = function
@@ -472,7 +472,8 @@ let interp_inversion_kind = function
 
 let rewrite_equations_tac as_mode othin id neqns names ba =
   let othin = interp_inversion_kind othin in
-  let tac = rewrite_equations as_mode othin neqns names ba in
+  let ba_list = Context.Named.to_list ba in
+  let tac = rewrite_equations as_mode othin neqns names ba_list in
   match othin with
   | Some true (* if Inversion_clear, clear the hypothesis *) ->
     tclTHEN tac (tclTRY (clear [id]))
@@ -564,7 +565,7 @@ let dinv_clear_tac id = dinv FullInversionClear None None (NamedHyp (CAst.make i
 
 let invIn k names ids id =
   Proofview.Goal.enter begin fun gl ->
-    let hyps = List.map (fun id -> Tacmach.pf_get_hyp id gl) ids in
+    let hyps = Context.Named.of_list (List.map (fun id -> Tacmach.pf_get_hyp id gl) ids) in
     let concl = Proofview.Goal.concl gl in
     let sigma = Proofview.Goal.sigma gl in
     let nb_prod_init = nb_prod sigma concl in
@@ -573,7 +574,7 @@ let invIn k names ids id =
         let sigma = Proofview.Goal.sigma gl in
         let concl = Proofview.Goal.concl gl in
         let nb_of_new_hyp =
-          nb_prod sigma concl - (List.length hyps + nb_prod_init)
+          nb_prod sigma concl - (Context.Named.length hyps + nb_prod_init)
         in
         if nb_of_new_hyp < 1 then
           intros_replacing ids

@@ -48,7 +48,7 @@ let { Goptions.get = option_LegacyFoUnif } =
     ~value:false ()
 
 (** Utils *)(* {{{ *****************************************************************)
-let env_size env = List.length (Environ.named_context env)
+let env_size env = Context.Named.length (Environ.named_context env)
 let safeDestApp sigma c =
   match EConstr.kind sigma c with App (f, a) -> f, a | _ -> c, [| |]
 (* Toplevel constr must be globalized twice ! *)
@@ -460,7 +460,7 @@ let evars_for_FO ~hack ~rigid env (ise0:evar_map) c0 =
   | Evar (k, a) ->
     if rigid k then map !sigma put c else
     let evi = Evd.find_undefined !sigma k in
-    let dc = List.firstn (max 0 (SList.length a - nenv)) (evar_filtered_context evi) in
+    let dc = Context.Named.firstn (max 0 (SList.length a - nenv)) (evar_filtered_context evi) in
     let abs_dc (d, c) = function
     | Context.Named.Declaration.LocalDef (x, b, t) ->
         d, mkNamedLetIn !sigma x (put b) (put t) c
@@ -1271,7 +1271,7 @@ let cleanup_XinE env sigma0 (h_k, _) x rp sigma =
           let nctx = Evd.evar_context evi in
           let nlen = Context.Named.length nctx in
           if nlen > len then begin
-            name := Some (Context.Named.Declaration.get_id (List.nth nctx (nlen - len - 1)))
+            name := Some (Context.Named.Declaration.get_id (Context.Named.nth nctx (nlen - len - 1)))
           end)
     with Not_found -> ref (Some x), fun _ -> () in
   let new_evars =

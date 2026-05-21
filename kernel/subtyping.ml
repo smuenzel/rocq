@@ -215,7 +215,7 @@ let check_inductive (cst, ustate) trace env mp1 l info1 mp2 mib2 subst1 subst2 r
   check (fun mib -> mib.mind_finite<>CoFinite) (==) (fun x -> FiniteInductiveFieldExpected x);
   if not (Int.equal (Declareops.mind_ntypes mib1) (Declareops.mind_ntypes mib2)) then
     error (InductiveNumbersFieldExpected { got = Declareops.mind_ntypes mib1; expected = Declareops.mind_ntypes mib2 });
-  assert (List.is_empty mib1.mind_hyps && List.is_empty mib2.mind_hyps);
+  assert (Context.Named.is_empty mib1.mind_hyps && Context.Named.is_empty mib2.mind_hyps);
   assert (Array.length mib1.mind_packets >= 1
             && Array.length mib2.mind_packets >= 1);
 
@@ -257,7 +257,7 @@ let check_constant (cst, ustate) trace env l info1 cb2 subst1 subst2 =
   match info1 with
     | IndType _ | IndConstr _ | Rules -> error DefinitionFieldExpected
     | Constant cb1 ->
-      let () = assert (List.is_empty cb1.const_hyps && List.is_empty cb2.const_hyps) in
+      let () = assert (Context.Named.is_empty cb1.const_hyps && Context.Named.is_empty cb2.const_hyps) in
       let cb1 = Declareops.subst_const_body subst1 cb1 in
       let cb2 = Declareops.subst_const_body subst2 cb2 in
       (* Start by checking universes *)

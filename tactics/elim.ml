@@ -10,7 +10,6 @@
 
 open Util
 open Names
-open Termops
 open EConstr
 open Inductiveops
 open Hipattern
@@ -45,7 +44,7 @@ let general_elim_using mk_elim (ind, u, args) id = match mk_elim with
 let elim_on_ba tac nassums =
   Proofview.Goal.enter begin fun gl ->
   let branches =
-    try List.rev (List.firstn nassums (Proofview.Goal.hyps gl))
+    try Context.Named.firstn nassums (Proofview.Goal.hyps gl)
     with Failure _ -> CErrors.anomaly (Pp.str "make_elim_branch_assumptions.")
   in
   tac branches
@@ -105,7 +104,7 @@ let rec general_decompose_aux recognizer id =
   let branchsigns = Tacticals.compute_constructor_signatures env ~rec_flag (ind, u) in
   let next_tac bas =
     let map id = ifOnHyp recognizer (general_decompose_aux recognizer) (fun _ -> tclIDTAC) id in
-    tclMAP map (ids_of_named_context bas)
+    tclMAP map (Context.Named.to_list_map Context.Named.Declaration.get_id bas)
   in
   let after_tac i =
     let nassums = List.length branchsigns.(i) in

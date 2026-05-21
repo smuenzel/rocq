@@ -117,7 +117,7 @@ let is_ground_env evd env =
     | NamedDecl.LocalDef (_,b,_) -> is_ground_term evd (EConstr.of_constr b)
     | _ -> true in
   Context.Rel.for_all is_ground_rel_decl (rel_context env) &&
-  List.for_all is_ground_named_decl (named_context env)
+  Context.Named.for_all is_ground_named_decl (named_context env)
 
 (* Expand head evar if any (currently consider only applications but I
    guess it should consider Case too) *)
@@ -232,9 +232,9 @@ let csubst_subst sigma { csubst_len = k; csubst_var = v; csubst_rel = s } c =
     if args' == args then c else Constr.mkEvar (evk, args') (* FIXME: preserve sharing *)
   | _ -> Constr.map_with_binders succ subst n c
 
-  and subst_instance n ctx args = match ctx, SList.view args with
-  | [], None -> SList.empty
-  | decl :: ctx, Some (c, args) ->
+  and subst_instance n ctx args = match Context.Named.uncons ctx, SList.view args with
+  | None, None -> SList.empty
+  | Some (decl, ctx), Some (c, args) ->
     let c' = match c with
     | None -> begin try Some (Id.Map.find (NamedDecl.get_id decl) v) with Not_found -> c end
     | Some c ->
@@ -242,7 +242,7 @@ let csubst_subst sigma { csubst_len = k; csubst_var = v; csubst_rel = s } c =
       if isVarId (NamedDecl.get_id decl) c' then None else Some c'
     in
     SList.cons_opt c' (subst_instance n ctx args)
-  | _ :: _, None | [], Some _ -> assert false
+  | Some _, None | None, Some _ -> assert false
   in
   let c = if k = 0 && Id.Map.is_empty v then c else subst 0 c in
   EConstr.of_constr c
@@ -358,7 +358,7 @@ let csubst_instance subst ctx =
   | SVar id -> SList.cons (EConstr.mkVar id) accu
   | exception Not_found -> SList.default accu
   in
-  List.fold_right fold ctx SList.empty
+  Context.Named.fold_outside fold ~init:SList.empty ctx
 
 let ext_rev_subst { ext_subst = subst } id0 =
   match Id.Map.find id0 subst.csubst_rev with
@@ -373,7 +373,7 @@ let push_rel_context_to_named_context ~hypnaming env sigma typ =
   let open EConstr in
   let ctx = named_context_val env in
   if Context.Rel.length (Environ.rel_context env) = 0 then
-    let inst = SList.defaultn (List.length @@ named_context_of_val ctx) SList.empty in
+    let inst = SList.defaultn (Context.Named.length @@ named_context_of_val ctx) SList.empty in
     (ctx, typ, inst, empty_csubst)
   else
     let avoid = Environ.ids_of_named_context_val (named_context_val env) in
@@ -460,7 +460,7 @@ let generalize_evar_over_rels sigma (ev,args) =
   let open EConstr in
   let evi = Evd.find_undefined sigma ev in
   let args = Evd.expand_existential sigma (ev, args) in
-  let sign = named_context_of_val (Evd.evar_hyps evi) in
+  let sign = Context.Named.to_list (named_context_of_val (Evd.evar_hyps evi)) in
   List.fold_left2
     (fun (c,inst as x) a d ->
       if isRel sigma a then (mkNamedProd_or_LetIn sigma d c,a::inst) else x)
@@ -483,7 +483,7 @@ let set_of_evctx l =
   List.fold_left (fun s decl -> Id.Set.add (NamedDecl.get_id decl) s) Id.Set.empty l
 
 let filter_effective_candidates evd evi filter candidates =
-  let ids = set_of_evctx (Filter.filter_list filter (evar_context evi)) in
+  let ids = set_of_evctx (Filter.filter_list filter (Context.Named.to_list (evar_context evi))) in
   List.filter (fun a -> Id.Set.subset (collect_vars evd a) ids) candidates
 
 let restrict_evar evd evk filter candidates =
@@ -548,7 +548,7 @@ let rec check_and_clear_in_constr ~is_section_variable env evdref err ids ~globa
                corresponding to e where hypotheses of ids have been
                removed *)
             let evi = Evd.find_undefined !evdref evk in
-            let ctxt = Evd.evar_filtered_context evi in
+            let ctxt = Context.Named.to_list (Evd.evar_filtered_context evi) in
             let rec fold accu ctxt args = match ctxt, SList.view args with
             | [], Some _ | _ :: _, None -> assert false
             | [], None -> accu

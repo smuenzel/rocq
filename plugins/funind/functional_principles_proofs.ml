@@ -647,7 +647,7 @@ let build_proof (interactive_proof : bool) (fnames : Constant.t list) ptes_infos
                    let env = Proofview.Goal.env g' in
                    let sigma = Proofview.Goal.sigma g' in
                    let open Context.Named.Declaration in
-                   let id = get_id @@ List.hd @@ Environ.named_context env in
+                   let id = get_id @@ Context.Named.hd @@ Environ.named_context env in
                    let new_term =
                      Reductionops.nf_betaiota env sigma (mkApp (dyn_infos.info, [|mkVar id|]))
                    in
@@ -964,7 +964,7 @@ let do_replace (evd : Evd.evar_map ref) params rec_arg_num rev_args_id f fun_num
         (Proofview.Goal.enter (fun g' ->
              let just_introduced = Tacticals.nLastDecls g' nb_intro_to_do in
              let open Context.Named.Declaration in
-             let just_introduced_id = List.map get_id just_introduced in
+             let just_introduced_id = Context.Named.to_list_map get_id just_introduced in
                (* Hack to synchronize the goal with the global env *)
                (Proofview.Unsafe.tclSETENV (Global.env ())) <*>
                (Equality.rewriteLR equation_lemma) <*>
@@ -1199,7 +1199,7 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
                       let fix_body = fix_info.body_with_param in
                       (*               observe (str "fix_body := "++ pr_lconstr_env (pf_env gl) fix_body); *)
                       let open Context.Named.Declaration in
-                      let args_id = List.map get_id args in
+                      let args_id = Context.Named.to_list_map get_id args in
                       let dyn_infos =
                         { nb_rec_hyps = -100
                         ; rec_hyps = []
@@ -1254,7 +1254,7 @@ let prove_princ_for_struct (evd : Evd.evar_map ref) interactive_proof fun_num
                       (* replacement of the function by its body *)
                       let args = Tacticals.nLastDecls g nb_args in
                       let open Context.Named.Declaration in
-                      let args_id = List.map get_id args in
+                      let args_id = Context.Named.to_list_map get_id args in
                       let dyn_infos =
                         { nb_rec_hyps = -100
                         ; rec_hyps = []

@@ -764,7 +764,7 @@ struct
       in
       let EvarInfo evi = Evd.find sigma evk in
       let hyps = evar_filtered_context evi in
-      let sigma, args = pretype_instance self ~flags env sigma loc hyps evk inst in
+      let sigma, args = pretype_instance self ~flags env sigma loc (Context.Named.to_list hyps) evk inst in
       let c = mkLEvar sigma (evk, args) in
       let j = Retyping.get_judgment_of !!env sigma c in
       discard_trace @@ inh_conv_coerce_to_tycon ?loc ~flags env sigma j tycon

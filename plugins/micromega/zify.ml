@@ -811,7 +811,7 @@ module CstrTable = struct
         (* Build the table of existing hypotheses *)
         let has_hyp =
           let hyps_table = HConstr.create 20 in
-          let () = List.iter
+          let () = Context.Named.iter_decl
             (fun decl -> HConstr.add hyps_table (NamedDecl.get_type decl) ())
             (EConstr.named_context env)
           in
@@ -1432,7 +1432,7 @@ let iter_let_aux tac =
       let env = Proofview.Goal.env gl in
       let sign = Environ.named_context env in
       init_cache ();
-      Tacticals.tclMAP (do_let tac) sign)
+      Tacticals.tclMAP (do_let tac) (Context.Named.to_list sign))
 
 let iter_let (tac : Ltac_plugin.Tacarg.tacvalue) =
   iter_let_aux (fun (id : Names.Id.t) t ty ->
@@ -1453,7 +1453,7 @@ let zify_tac =
       let sign = Environ.named_context env in
       let concl = Proofview.Goal.concl gl in
       let evd, concl = trans_check_prop env evd concl in
-      let evd, hyps = trans_hyps env evd sign in
+      let evd, hyps = trans_hyps env evd (Context.Named.to_list sign) in
       let l = CstrTable.get () in
       Proofview.tclTHEN (Proofview.Unsafe.tclEVARS evd)
         (tclTHENOpt concl trans_concl
@@ -1545,7 +1545,7 @@ let spec_of_hyps =
       let env = Proofview.Goal.env gl in
       let concl = Proofview.Goal.concl gl in
       let evd = Proofview.Goal.sigma gl in
-      let terms = concl :: List.map NamedDecl.get_type (EConstr.named_context env) in
+      let terms = concl :: Context.Named.to_list_map NamedDecl.get_type (EConstr.named_context env) in
       let s = fresh_subscript env in
       let env =
         List.fold_left
@@ -1639,7 +1639,8 @@ let saturate =
       in
       (* Collect all the potential saturation lemma *)
       sat concl;
-      let () = List.iter (fun decl -> sat (NamedDecl.get_type decl)) hyps in
+      let () = Context.Named.iter_decl (fun decl -> sat (NamedDecl.get_type decl)) hyps in
+      let hyps_list = Context.Named.to_list hyps in
       let s0 = fresh_subscript env in
-      let (_,tacs,_) = CstrTable.HConstr.fold (fun c d acc -> sat_constr env evd hyps acc c d) table (s0,[],[]) in
+      let (_,tacs,_) = CstrTable.HConstr.fold (fun c d acc -> sat_constr env evd hyps_list acc c d) table (s0,[],[]) in
       Tacticals.tclTHENLIST tacs)

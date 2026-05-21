@@ -1747,7 +1747,7 @@ let cl_rewrite_clause_newtac ?origsigma ~progress abs strat clause =
       (* Only consider variables not depending on [id] *)
       let ctx = named_context env in
       let filter decl = not (occur_var_in_decl env sigma id decl) in
-      let nctx = List.filter filter ctx in
+      let nctx = Context.Named.filter filter ctx in
       Environ.reset_with_named_context (val_of_named_context nctx) env
     in
     try

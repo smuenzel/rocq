@@ -699,7 +699,7 @@ let mkDestructEq not_on_hyp env sigma expr =
           || not (Termops.dependent sigma expr (get_type decl))
         then None
         else Some id)
-      hyps
+      (Context.Named.to_list hyps)
   in
   let to_revert_constr = List.rev_map mkVar to_revert in
   let sigma, type_of_expr = Typing.type_of env sigma expr in
@@ -892,7 +892,7 @@ let rec prove_le () =
                 | _ -> None
               in
               let h, t =
-                List.find_map_exn matching_fun (EConstr.named_context env)
+                List.find_map_exn matching_fun (Context.Named.to_list (EConstr.named_context env))
               in
               let y =
                 let _, args = decompose_app_list sigma t in

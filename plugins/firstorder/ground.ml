@@ -112,6 +112,6 @@ let ground_tac ~flags solver startseq =
             with Heap.EmptyHeap->solver
       end
     end in
-    let n = List.length (Proofview.Goal.hyps gl) in
+    let n = Context.Named.length (Proofview.Goal.hyps gl) in
     startseq (fun seq -> wrap ~flags n true (toptac []) seq)
   end

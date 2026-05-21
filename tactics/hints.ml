@@ -76,14 +76,14 @@ let secvars_of_hyps hyps =
   let secctx = Global.named_context () in
   let open Context.Named.Declaration in
   let pred, all =
-    List.fold_left (fun (pred,all) decl ->
+    Context.Named.fold_inside (fun (pred,all) decl ->
         try let _ = Context.Named.lookup (get_id decl) hyps in
           (* Approximation, it might be an hypothesis reintroduced with same name and unconvertible types,
              we must allow it currently, as comparing the declarations for syntactic equality is too
              strong a check (e.g. an unfold in a section variable would make it unusable). *)
           (Id.Pred.add (get_id decl) pred, all)
         with Not_found -> (pred, false))
-      (Id.Pred.empty,true) secctx
+      ~init:(Id.Pred.empty,true) secctx
   in
   if all then Id.Pred.full (* If the whole section context is available *)
   else pred
@@ -1552,7 +1552,7 @@ let make_local_hint_db env sigma ts eapply lems =
     | None -> Hint_db.transparent_state (searchtable_map "core")
     | Some ts -> ts
   in
-  let hintlist = List.map_append (fun decl -> make_resolve_hyp env sigma (Named.Declaration.get_id decl)) sign in
+  let hintlist = List.map_append (fun decl -> make_resolve_hyp env sigma (Named.Declaration.get_id decl)) (Context.Named.to_list sign) in
   Hint_db.empty ts false
   |> Hint_db.add_list env sigma hintlist
   |> Hint_db.add_list env sigma (constructor_hints env sigma eapply lems)

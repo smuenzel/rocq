@@ -409,7 +409,7 @@ type aliases = {
 let compute_var_aliases sign sigma =
   let open Context.Named.Declaration in
   (* push from oldest to more recent variables *)
-  List.fold_right (fun decl aliases ->
+  Context.Named.fold_outside (fun decl aliases ->
     let id = get_id decl in
     match decl with
     | LocalDef (_,t,_) ->
@@ -422,7 +422,7 @@ let compute_var_aliases sign sigma =
           init_term_alias_chain t in
       Id.Map.add id aliases_of_id aliases
     | LocalAssum _ -> aliases)
-    sign Id.Map.empty
+    sign ~init:Id.Map.empty
 
 let compute_rel_aliases var_aliases rels sigma =
   (* push from oldest to more recent variables *)
@@ -622,7 +622,7 @@ let remove_instance_local_defs evd evk args =
   | LocalDef _ :: sign, _ :: args -> aux sign args
   | _ -> assert false
   in
-  aux (evar_filtered_context evi) args
+  aux (Context.Named.to_list (evar_filtered_context evi)) args
 
 (* Check if an applied evar "?X[args] l" is a Miller's pattern *)
 
@@ -722,11 +722,11 @@ type esubst = {
 }
 
 let make_constructor_subst sigma sign args =
-  let rec fold decls args accu = match decls, SList.view args with
-  | _ :: _, None | [], Some _ -> assert false
-  | [], None -> accu
-  | LocalAssum ({ binder_name = id }, _) :: decls, Some (Some a, args) ->
-    let accu = fold decls args accu in
+  let rec fold decls args accu = match Context.Named.uncons decls, SList.view args with
+  | None, None -> accu
+  | None, Some _ | Some _, None -> assert false
+  | Some (LocalAssum ({ binder_name = id }, _), decls'), Some (Some a, args) ->
+    let accu = fold decls' args accu in
     let a', args = decompose_app sigma a in
     begin match EConstr.kind sigma a' with
     | Construct (cstr, _) ->
@@ -734,19 +734,19 @@ let make_constructor_subst sigma sign args =
       Constrmap_env.add cstr ((args, id) :: l) accu
     | _ -> accu
     end
-  | LocalAssum _ :: decls, Some (None, args) -> fold decls args accu
-  | LocalDef _ :: decls, Some (_, args) -> fold decls args accu
+  | Some (LocalAssum _, decls'), Some (None, args) -> fold decls' args accu
+  | Some (LocalDef _, decls'), Some (_, args) -> fold decls' args accu
   in
   fold sign args Constrmap_env.empty
 
 let make_projectable_subst aliases sigma sign args =
   let evar_aliases = compute_var_aliases sign sigma in
   (* First compute aliasing equivalence classes *)
-  let rec fold accu args decls = match SList.view args, decls with
-  | None, _ :: _ | Some _, [] -> assert false
-  | None, [] -> accu
-  | Some (a, args), decl :: decls ->
-    let (i, all, vals, revmap) = fold accu args decls in
+  let rec fold accu args decls = match SList.view args, Context.Named.uncons decls with
+  | None, None -> accu
+  | None, Some _ | Some _, None -> assert false
+  | Some (a, args), Some (decl, decls') ->
+    let (i, all, vals, revmap) = fold accu args decls' in
     let id = get_id decl in
     let a = match a with None -> mkVar id | Some a -> a in
     let revmap = Id.Map.add id i revmap in
@@ -1154,7 +1154,7 @@ let filter_effective_candidates evd evi filter candidates =
   match filter with
   | None -> candidates
   | Some filter ->
-      let ids = set_of_evctx (Filter.filter_list filter (evar_context evi)) in
+      let ids = set_of_evctx (Filter.filter_list filter (Context.Named.to_list (evar_context evi))) in
       List.filter (fun a -> Id.Set.subset (collect_vars evd a) ids) candidates
 
 let filter_candidates evd evk filter candidates_update =
@@ -1187,7 +1187,7 @@ let closure_of_filter ~can_drop evd evk = function
                     | LocalDef (_,c,_) ->
                        not (can_drop || isRel evd c || isVar evd c)
   in
-  let newfilter = Filter.map_along test filter (evar_context evi) in
+  let newfilter = Filter.map_along test filter (Context.Named.to_list (evar_context evi)) in
   (* Now ensure that restriction is at least what is was originally *)
   let newfilter = Option.cata (Filter.map_along (&&) newfilter) newfilter (Filter.repr (evar_filter evi)) in
   if Filter.equal newfilter (evar_filter evi) then None else Some newfilter
@@ -1618,12 +1618,12 @@ let rec invert_definition unify flags choose imitate_defs
   let fast =
     let names = ref Id.Set.empty in
     let rec is_id_subst ctxt s =
-      match ctxt, SList.view s with
-      | (decl :: ctxt'), Some (c, s') ->
+      match Context.Named.uncons ctxt, SList.view s with
+      | Some (decl, ctxt'), Some (c, s') ->
         let id = get_id decl in
         names := Id.Set.add id !names;
         (match c with None -> true | Some c -> isVarId evd id c) && is_id_subst ctxt' s'
-      | [], None -> true
+      | None, None -> true
       | _ -> false
     in
       is_id_subst sign argsv &&

@@ -234,7 +234,7 @@ let check_inductive env mind mb retro =
 
   Array.iter2 (check_packet mind) mb.mind_packets mind_packets;
   check "mind_finite" (mb.mind_finite == mind_finite);
-  check "mind_hyps" (List.is_empty mind_hyps);
+  check "mind_hyps" (Context.Named.is_empty mind_hyps);
   check "mind_univ_hyps" (UVars.Instance.is_empty mind_univ_hyps);
   check "mind_nparams" Int.(equal mb.mind_nparams mind_nparams);
 

@@ -262,7 +262,7 @@ let rename_hyp repl =
       let replace id = try List.assoc_f Id.equal id repl with Not_found -> id in
       let map decl = decl |> NamedDecl.map_id replace |> NamedDecl.map_constr subst in
       let ohyps = named_context_of_val sign in
-      let nhyps = List.map map ohyps in
+      let nhyps = Context.Named.map_decl map ohyps in
       let nconcl = subst concl in
       let nctx = val_of_named_context nhyps in
       let fold odecl ndecl accu =
@@ -271,7 +271,7 @@ let rename_hyp repl =
         else
           SList.cons (mkVar @@ NamedDecl.get_id odecl) accu
       in
-      let instance = List.fold_right2 fold ohyps nhyps SList.empty in
+      let instance = List.fold_right2 fold (Context.Named.to_list ohyps) (Context.Named.to_list nhyps) SList.empty in
       Refine.refine_with_principal ~typecheck:false begin fun sigma ->
         let sigma, ev = Evarutil.new_pure_evar nctx sigma ~relevance nconcl in
         sigma, mkEvar (ev, instance), Some ev
@@ -350,9 +350,9 @@ let get_next_hyp_position env sigma id =
   aux
 
 let get_previous_hyp_position env sigma id =
-  let rec aux dest = function
-  | [] -> error_no_such_hypothesis env sigma id
-  | decl :: right ->
+  let rec aux dest hyps = match Context.Named.uncons hyps with
+  | None -> error_no_such_hypothesis env sigma id
+  | Some (decl, right) ->
       let hyp = NamedDecl.get_id decl in
       if Id.equal hyp id then dest else aux (MoveAfter hyp) right
   in
@@ -377,7 +377,7 @@ let internal_cut ?(check=true) replace id t =
     let r = Retyping.relevance_of_type env sigma t in
     let env',t,concl,sigma =
       if replace then
-        let nexthyp = get_next_hyp_position env sigma id (named_context_of_val sign) in
+        let nexthyp = get_next_hyp_position env sigma id (Context.Named.to_list (named_context_of_val sign)) in
         let sigma,sign',t,concl = clear_hyps2 env sigma (Id.Set.singleton id) sign t concl in
         let sign' = insert_decl_in_named_context env sigma (LocalAssum (make_annot id r,t)) nexthyp sign' in
         Environ.reset_with_named_context sign' env,t,concl,sigma
@@ -949,7 +949,7 @@ let intro_forthcoming_last_then_gen avoid dep_flag bound n tac =
     else Refine.refine_with_principal ~typecheck:false begin fun sigma ->
       let ctx = named_context_val env in
       let nctx = List.fold_right push_named_context_val ndecls ctx in
-      let inst = SList.defaultn (List.length @@ Environ.named_context env) SList.empty in
+      let inst = SList.defaultn (Context.Named.length (Environ.named_context env)) SList.empty in
       let rels = List.init (List.length decls) (fun i -> mkRel (i + 1)) in
       let ninst = List.fold_right (fun c accu -> SList.cons c accu) rels inst in
       let (sigma, ev) = new_pure_evar nctx sigma ~relevance nconcl in
@@ -988,7 +988,7 @@ let intro_replacing id =
   Proofview.Goal.enter begin fun gl ->
   let env, sigma = Proofview.Goal.(env gl, sigma gl) in
   let hyps = Proofview.Goal.hyps gl in
-  let next_hyp = get_next_hyp_position env sigma id hyps in
+  let next_hyp = get_next_hyp_position env sigma id (Context.Named.to_list hyps) in
   Tacticals.tclTHENLIST [
     clear_for_replacing [id];
     introduction id;
@@ -1009,7 +1009,8 @@ let intros_possibly_replacing ids =
   Proofview.Goal.enter begin fun gl ->
     let env, sigma = Proofview.Goal.(env gl, sigma gl) in
     let hyps = Proofview.Goal.hyps gl in
-    let posl = List.map (fun id -> (id, get_next_hyp_position env sigma id hyps)) ids in
+    let hyps_list = Context.Named.to_list hyps in
+    let posl = List.map (fun id -> (id, get_next_hyp_position env sigma id hyps_list)) ids in
     Tacticals.tclTHEN
       (Tacticals.tclMAP (fun id ->
         Tacticals.tclTRY (clear_for_replacing [id]))
@@ -1024,7 +1025,8 @@ let intros_replacing ids =
   Proofview.Goal.enter begin fun gl ->
     let hyps = Proofview.Goal.hyps gl in
     let env, sigma = Proofview.Goal.(env gl, sigma gl) in
-    let posl = List.map (fun id -> (id, get_next_hyp_position env sigma id hyps)) ids in
+    let hyps_list = Context.Named.to_list hyps in
+    let posl = List.map (fun id -> (id, get_next_hyp_position env sigma id hyps_list)) ids in
     Tacticals.tclTHEN
       (clear_for_replacing ids)
       (Tacticals.tclMAP (fun (id,pos) -> intro_move (Some id) pos) posl)
@@ -1854,15 +1856,15 @@ let exact_proof c =
 (** For efficiency reasons we first try to find a hypothesis whose type
     is syntactically equal to the goal. If this fails we retry with full conversion. *)
 let assumption =
-  let rec arec gl only_eq = function
-  | [] ->
+  let rec arec gl only_eq hyps = match Context.Named.uncons hyps with
+  | None ->
     if only_eq then
       let hyps = Proofview.Goal.hyps gl in
       arec gl false hyps
     else
       let info = Exninfo.reify () in
       Tacticals.tclZEROMSG ~info (str "No such assumption.")
-  | decl::rest ->
+  | Some (decl, rest) ->
     let t = NamedDecl.get_type decl in
     let concl = Proofview.Goal.concl gl in
     let sigma = Proofview.Goal.sigma gl in
@@ -1931,9 +1933,9 @@ let clear_body idl =
         let env = push_named_context ctx base_env in
         env, sigma, Id.Set.empty
       else
-        match ctx with
-        | [] -> assert false
-        | decl :: ctx ->
+        match Context.Named.uncons ctx with
+        | None -> assert false
+        | Some (decl, ctx') ->
           let decl, ids, found =
             match decl with
             | LocalAssum (id,t) ->
@@ -1947,7 +1949,7 @@ let clear_body idl =
                then LocalAssum (id, t), Id.Set.remove id.binder_name ids, true
                else decl, ids, false
           in
-          let env, sigma, ids = fold ids ctx in
+          let env, sigma, ids = fold ids ctx' in
           if Id.Set.exists (fun id -> occur_var_in_decl env sigma id decl) ids then
             let sigma = check_decl env sigma idl ids decl in (* can sigma really change? *)
             let ids = Id.Set.add (get_id decl) ids in
@@ -2834,7 +2836,7 @@ let unfold_body x =
   in
   let xval = EConstr.of_constr xval in
   Tacticals.afterHyp x begin fun aft ->
-  let hl = List.fold_right (fun decl cl -> (NamedDecl.get_id decl, InHyp) :: cl) aft [] in
+  let hl = Context.Named.fold_outside (fun decl cl -> (NamedDecl.get_id decl, InHyp) :: cl) aft ~init:[] in
   let rfun _ _ c = replace_vars sigma [x, xval] c in
   let reducth h = reduct_in_hyp ~check:false ~reorder:false rfun h in
   let reductc = reduct_in_concl ~cast:false ~check:false (rfun, DEFAULTcast) in

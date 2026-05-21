@@ -489,6 +489,15 @@ struct
       let id' = f id in
       if id == id' then x else set_id id' x
 
+    (** Map the relevance *)
+    let map_relevance f = function
+      | LocalAssum (id, ty) as decl ->
+          let id' = map_annot_relevance f id in
+          if id == id' then decl else LocalAssum (id', ty)
+      | LocalDef (id, v, ty) as decl ->
+          let id' = map_annot_relevance f id in
+          if id == id' then decl else LocalDef (id', v, ty)
+
     (** For local assumptions, this function returns the original local assumptions.
         For local definitions, this function maps the value in the local definition. *)
     let map_value f = function
@@ -578,56 +587,182 @@ struct
   (** Named-context is represented as a list of declarations.
       Inner-most declarations are at the beginning of the list.
       Outer-most declarations are at the end of the list. *)
-  type ('constr, 'types, 'r) pt = ('constr, 'types, 'r) Declaration.pt list
+  type ('constr, 'types, 'r) pt = int * ('constr, 'types, 'r) Declaration.pt list
+
+  let to_list (_, ctx) = ctx
+  let of_list ctx = List.length ctx, ctx
+
+  let of_list_map f l = List.length l, List.map f l
+
+  let to_list_map f (_, ctx) = List.map f ctx
+  let to_list_rev_map f (_, ctx) = List.rev_map f ctx
+
+  let to_list_rev (_, ctx) = List.rev ctx
+
+  let to_list_map_i f i (_, ctx) = List.map_i f i ctx
+
+  let to_list_until f (_, ctx) =
+    let a, ctx = List.map_until f ctx in
+    a, of_list ctx
+
+  let uncons (n, ctx) = match ctx with
+  | [] -> None
+  | decl :: ctx -> Some (decl, (n - 1, ctx))
 
   (** empty named-context *)
-  let empty = []
+  let empty = 0, []
+
+  let is_empty (_, ctx) = List.is_empty ctx
+
+  let init n f = n, List.init n f
 
   (** Return a new named-context enriched by with a given inner-most declaration. *)
-  let add d ctx = d :: ctx
+  let add d (n, ctx) = n+1, d :: ctx
+
+  let append (n1, ctx1) (n2, ctx2) = n1 + n2, ctx1 @ ctx2
+
+  let rev (n, ctx) = n, List.rev ctx
+
+  let firstn n (n', ctx) = min n n', List.firstn n ctx
+
+  let skipn n (n', ctx) = n' - n, List.skipn n ctx
+
+  let sep_last (n, ctx) = let d, ctx' = List.sep_last ctx in
+    d, (n - 1, ctx')
+
+  let nth (_, ctx) n = List.nth ctx n
+
+  let hd (_, ctx) = match ctx with
+  | [] -> CErrors.anomaly (Pp.str "hd: empty named context")
+  | d :: _ -> d
 
   (** Return the number of {e local declarations} in a given named-context. *)
-  let length = List.length
+  let length (n, _) = n
 
-(** Return a declaration designated by a given identifier
-    @raise Not_found if the designated identifier is not present in the designated named-context. *)
-  let rec lookup id = function
+  (** Return the number of {e local assumptions} in a given named-context. *)
+  let nhyps (_, ctx) =
+    let open Declaration in
+    List.count is_local_assum ctx
+
+  (** Return a declaration designated by a given identifier
+      @raise Not_found if the designated identifier is not present in the designated named-context. *)
+  let rec lookup id ctx =
+    match ctx with
     | decl :: _ when Id.equal id (Declaration.get_id decl) -> decl
     | _ :: sign -> lookup id sign
     | [] -> raise Not_found
 
+  let lookup id (_, ctx) = lookup id ctx
+
   (** Check whether given two named-contexts are equal. *)
-  let equal eqr eq l = List.equal (fun c -> Declaration.equal eqr eq c) l
+  let equal eqr eq (n1, l1) (n2, l2) = n1 = n2 && List.equal (fun c -> Declaration.equal eqr eq c) l1 l2
 
   (** Map all terms in a given named-context. *)
-  let map f = List.Smart.map (Declaration.map_constr f)
+  let map f (n, ctx) = n, List.Smart.map (Declaration.map_constr f) ctx
 
-  let map_with_relevance g f = List.Smart.map (Declaration.map_constr_with_relevance g f)
+  let map_with_relevance g f ((n, ctx) as rctx) =
+    let result = List.Smart.map (Declaration.map_constr_with_relevance g f) ctx in
+    if result == ctx then rctx else n, result
 
-  let map_het fr f = List.map (Declaration.map_constr_het fr f)
+  let map_relevance f ((n, ctx) as rctx) =
+    let result = List.Smart.map (Declaration.map_relevance f) ctx in
+    if result == ctx then rctx else n, result
+
+  let map_het fr f (n, ctx) = n, List.map (Declaration.map_constr_het fr f) ctx
+
+  let map_with_binders f ((n, ctx) as rctx) =
+    let rec aux k = function
+      | decl :: ctx as l ->
+        let decl' = Declaration.map_constr (f k) decl in
+        let ctx' = aux (k-1) ctx in
+        if decl == decl' && ctx == ctx' then l else decl' :: ctx'
+      | [] -> []
+    in
+    let result = aux n ctx in
+    if result == ctx then rctx else n, result
+
+  let map_decl f (n, ctx) = n, List.map f ctx
+
+  let map_decl_i f i (n, ctx) = n, List.map_i f i ctx
+
+  let map_decl_smart f ((n, ctx) as rctx) =
+    let result = List.Smart.map f ctx in
+    if result == ctx then rctx else n, result
+
+  let map_decl2 f l (n, ctx) = n, List.map2 f l ctx
+
+  let filter f (_, ctx) = List.filter f ctx |> of_list
+
+  let for_all f (_, ctx) = List.for_all f ctx
+
+  let for_all_i f i (_, ctx) = List.for_all_i f i ctx
+
+  let exists f (_, ctx) = List.exists f ctx
 
   (** Perform a given action on every declaration in a given named-context. *)
-  let iter f = List.iter (Declaration.iter_constr f)
+  let iter f (_, ctx) = List.iter (Declaration.iter_constr f) ctx
+
+  let iter_decl f (_, ctx) = List.iter f ctx
+
+  let count f (_, ctx) = List.count f ctx
 
   (** Reduce all terms in a given named-context to a single value.
       Innermost declarations are processed first. *)
-  let fold_inside f ~init = List.fold_left f init
+  let fold_inside f ~init (_, ctx) = List.fold_left f init ctx
+
+  let fold_inside_i f i ~init (_, ctx) = List.fold_left_i f i init ctx
 
   (** Reduce all terms in a given named-context to a single value.
       Outermost declarations are processed first. *)
-  let fold_outside f l ~init = List.fold_right f l init
+  let fold_outside f (_, l) ~init = List.fold_right f l init
+
+  let fold_outside_map f (n, l) ~init =
+    let l, result = List.fold_right_map f l init in
+    (n, l), result
+
+  let fold_outside2 f l' (_, l) ~init = List.fold_right2 f l' l init
 
   (** Return the set of all identifiers bound in a given named-context. *)
-  let to_vars l =
+  let to_vars (_, l) =
     List.fold_left (fun accu decl -> Id.Set.add (Declaration.get_id decl) accu) Id.Set.empty l
 
-  let drop_bodies l = List.Smart.map Declaration.drop_body l
+  (** Map a given named-context to a list where each {e local definition} is mapped to [true]
+      and each {e local assumption} is mapped to [false]. *)
+  let to_tags (_, l) =
+    let rec aux l = function
+      | [] -> l
+      | Declaration.LocalDef _ :: ctx -> aux (true::l) ctx
+      | Declaration.LocalAssum _ :: ctx -> aux (false::l) ctx
+    in aux [] l
+
+  let drop_bodies l = map_decl_smart Declaration.drop_body l
+
+  let chop n (n', l) =
+    let l1, l2 = List.chop n l in
+    (n, l1), (n' - n, l2)
+
+  let chop_nhyps n_local_assum (n_total, l) =
+    let open Declaration in
+    let rec aux acc_size l' = function
+      | (0, l) -> ((acc_size, List.rev l'), (n_total - acc_size, l))
+      | (n, (LocalDef _ as h) :: l) -> aux (acc_size + 1) (h::l') (n, l)
+      | (n, (LocalAssum _ as h) :: l) -> aux (acc_size + 1) (h::l') (n-1, l)
+      | (_, []) -> CErrors.anomaly (Pp.str "chop_nhyps: not enough hypotheses.")
+    in aux 0 [] (n_local_assum,l)
+
+  let split_when f (n, l) =
+    let rec aux n_before acc = function
+    | [] -> ((n_before, List.rev acc), (0, []))
+    | d :: rest as l ->
+      if f d then ((n_before, List.rev acc), (n - n_before, l))
+      else aux (n_before + 1) (d :: acc) rest
+    in aux 0 [] l
 
   (** [to_instance Ω] builds an instance [args] in reverse order such
       that [Ω ⊢ args:Ω] where [Ω] is a named context and with the local
       definitions of [Ω] skipped. Example: for [id1:T,id2:=c,id3:U], it
       gives [Var id1, Var id3]. All [idj] are supposed distinct. *)
-  let to_instance mk l =
+  let to_instance mk (_, l) =
     let filter = function
       | Declaration.LocalAssum (id, _) -> Some (mk id.binder_name)
       | _ -> None
@@ -638,7 +773,7 @@ struct
       that [Ω ⊢ args:Ω] where [Ω] is a named context and with the local
       definitions of [Ω] skipped. Example: for [id1:T,id2:=c,id3:U], it
       gives [Var id1, Var id3]. All [idj] are supposed distinct. *)
-  let instance_list mk l =
+  let instance_list mk (_, l) =
     let filter = function
       | Declaration.LocalAssum (id, _) -> Some (mk id.binder_name)
       | _ -> None

@@ -191,7 +191,7 @@ let interp_context_gen ~program_mode ~poly ~kind ~autoimp_enable ~coercions env 
   (* Note, we must use the normalized evar from now on! *)
   let sigma = solve_remaining_evars all_and_fail_flags env ~initial sigma in
   let sigma, ctx = Evarutil.finalize ~poly sigma @@ fun nf ->
-    List.map (NamedDecl.map_constr_het (fun x -> x) nf) ctx
+    Context.Named.map_decl (NamedDecl.map_constr_het (fun x -> x) nf) ctx
   in
   (* reorder, evar-normalize and add implicit status *)
   let ctx = List.map2 (fun loc d ->
@@ -202,7 +202,7 @@ let interp_context_gen ~program_mode ~poly ~kind ~autoimp_enable ~coercions env 
       let impls = if autoimp_enable then find_implicits id ienv else [] in
       let data = (impl,kind,is_coe,impls) in
       (CAst.make ?loc id,b,t,data))
-      locs ctx
+      locs (Context.Named.to_list ctx)
   in
   sigma, List.rev ctx
 

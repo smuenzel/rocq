@@ -96,7 +96,7 @@ let subst_const_def subst def = match def with
 
 let subst_const_body subst cb =
   (* we're outside sections *)
-  assert (List.is_empty cb.const_hyps && UVars.Instance.is_empty cb.const_univ_hyps);
+  assert (Context.Named.is_empty cb.const_hyps && UVars.Instance.is_empty cb.const_univ_hyps);
   if is_empty_subst subst then cb
   else
     let body' = subst_const_def subst cb.const_body in
@@ -104,7 +104,7 @@ let subst_const_body subst cb =
     if body' == cb.const_body && type' == cb.const_type
     then cb
     else
-      { const_hyps = [];
+      { const_hyps = Context.Named.empty;
         const_univ_hyps = UVars.Instance.empty;
         const_body = body';
         const_type = type';
@@ -242,9 +242,9 @@ let subst_mind_packet subst mbp =
 
 let subst_mind_body subst mib =
   (* we're outside sections *)
-  assert (List.is_empty mib.mind_hyps && UVars.Instance.is_empty mib.mind_univ_hyps);
+  assert (Context.Named.is_empty mib.mind_hyps && UVars.Instance.is_empty mib.mind_univ_hyps);
   { mind_finite = mib.mind_finite ;
-    mind_hyps = [];
+    mind_hyps = Context.Named.empty;
     mind_univ_hyps = UVars.Instance.empty;
     mind_nparams = mib.mind_nparams;
     mind_nparams_rec = mib.mind_nparams_rec;

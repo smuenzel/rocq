@@ -46,7 +46,7 @@ let e_assumption =
     let hyps = Proofview.Goal.hyps gl in
     let sigma = Proofview.Goal.sigma gl in
     let concl = Proofview.Goal.concl gl in
-    if List.is_empty hyps then
+    if Context.Named.is_empty hyps then
       Tacticals.tclZEROMSG (str "No applicable tactic.")
     else
       let not_ground = occur_existential sigma concl in
@@ -58,7 +58,7 @@ let e_assumption =
         else
           exact_check (mkVar id)
       in
-      Tacticals.tclFIRST (List.map map hyps)
+      Tacticals.tclFIRST (Context.Named.to_list_map map hyps)
   end
 
 (************************************************************************)
@@ -102,10 +102,7 @@ let rec e_trivial_fail_db db_list local_db =
   let next = Proofview.Goal.enter begin fun gl ->
     let env = Proofview.Goal.env gl in
     let sigma = Proofview.Goal.sigma gl in
-    let d = match EConstr.named_context env with
-    | [] -> assert false
-    | d :: _ -> NamedDecl.get_id d
-    in
+    let d = NamedDecl.get_id (Context.Named.hd (EConstr.named_context env)) in
     let local_db = push_resolve_hyp env sigma d local_db in
     e_trivial_fail_db db_list local_db
   end in
@@ -218,7 +215,7 @@ module Search = struct
     in
     let intro_tac =
       let mkdb env sigma =
-        push_resolve_hyp env sigma (NamedDecl.get_id (List.hd (EConstr.named_context env))) db
+        push_resolve_hyp env sigma (NamedDecl.get_id (Context.Named.hd (EConstr.named_context env))) db
       in
       (false, mkdb, Tactics.intro, lazy (str "intro"))
     in
