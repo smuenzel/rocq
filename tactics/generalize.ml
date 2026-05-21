@@ -63,11 +63,12 @@ let fresh_id_in_env avoid id env =
 let bring_hyps hyps =
   if Context.Named.is_empty hyps then Tacticals.tclIDTAC
   else
+    let hyps = Context.Named.rev hyps in
     Proofview.Goal.enter begin fun gl ->
       let env = Proofview.Goal.env gl in
       let sigma = Proofview.Goal.sigma gl in
       let concl = Proofview.Goal.concl gl in
-      let newcl = Context.Named.fold_inside (fun c d -> mkNamedProd_or_LetIn sigma d c) ~init:concl hyps in
+      let newcl = it_mkNamedProd_or_LetIn sigma concl hyps in
       let args = Context.Named.instance mkVar hyps in
       Refine.refine_with_principal ~typecheck:false begin fun sigma ->
         let (sigma, ev) =
