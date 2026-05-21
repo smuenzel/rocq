@@ -275,27 +275,26 @@ let abstract_as_sort cache s =
 let abstract_named_context expand_info abstr_ausubst hyps =
   let fold decl abstr_ctx =
     let cache = RefTable.create 13 in
-    let ctx = Context.Named.of_list abstr_ctx in
     let decl = match decl with
     | NamedDecl.LocalDef (id, b, t) ->
       let id = Context.map_annot_relevance (UVars.subst_sort_level_relevance (make_instance_subst abstr_ausubst)) id in
-      let b = expand_subst0 cache expand_info ctx abstr_ausubst b in
-      let t = expand_subst0 cache expand_info ctx abstr_ausubst t in
+      let b = expand_subst0 cache expand_info abstr_ctx abstr_ausubst b in
+      let t = expand_subst0 cache expand_info abstr_ctx abstr_ausubst t in
       NamedDecl.LocalDef (id, b, t)
     | NamedDecl.LocalAssum (id, t) ->
       let id = Context.map_annot_relevance (UVars.subst_sort_level_relevance (make_instance_subst abstr_ausubst)) id in
-      let t = expand_subst0 cache expand_info ctx abstr_ausubst t in
+      let t = expand_subst0 cache expand_info abstr_ctx abstr_ausubst t in
       NamedDecl.LocalAssum (id, t)
     in
-    decl :: abstr_ctx
+    Context.Named.add decl abstr_ctx
   in
-  Context.Named.fold_outside fold hyps ~init:[]
+  Context.Named.fold_outside fold hyps ~init:Context.Named.empty
 
 let create_cache info =
   let cache = RefTable.create 13 in
   let abstr_info = info.abstr_info in
   let named_ctx = lazy (abstract_named_context info.expand_info abstr_info.abstr_ausubst abstr_info.abstr_ctx) in
-  let rel_ctx = lazy (Context.Rel.of_list (List.map NamedDecl.to_rel_decl (Lazy.force named_ctx))) in
+  let rel_ctx = lazy (Context.Rel.of_list (Context.Named.to_list_map NamedDecl.to_rel_decl (Lazy.force named_ctx))) in
   { cache; info; rel_ctx }
 
 (** Turn a named context [Δ] (hyps) and a universe named context
