@@ -205,16 +205,19 @@ let match_named_context_val c = match Context.Named.uncons c.env_named_ctx with
 
 let map_named_val f ctxt =
   let open Context.Named.Declaration in
-  let map = ref ctxt.env_named_map in
-  let ctx = Context.Named.map_decl_smart (fun d ->
+  let fold accu d =
     let d' = f d in
-    if d == d' then d'
-    else (map := Id.Map.set (get_id d) d' !map; d')
-  ) ctxt.env_named_ctx in
-  let map = !map in
+    let accu =
+      if d == d' then accu
+      else Id.Map.set (get_id d) d' accu
+    in
+    (accu, d')
+  in
+  let map, ctx = List.Smart.fold_left_map fold ctxt.env_named_map (Context.Named.to_list ctxt.env_named_ctx) in
+  let ctx = Context.Named.of_list ctx in
   if map == ctxt.env_named_map then ctxt
   else
-    let idx = Context.Named.fold_outside (fun d idx -> Range.cons d idx) ~init:Range.empty ctx in
+    let idx = Context.Named.fold_outside Range.cons ctx ~init:Range.empty in
     { env_named_ctx = ctx; env_named_map = map; env_named_idx = idx }
 
 let push_named d env =
@@ -1016,7 +1019,7 @@ let apply_to_hyp ctxt id f =
     match match_named_context_val ctxt with
     | Some (d, ctxt) ->
         if Id.equal (get_id d) id then
-          push_named_context_val (f (named_context_of_val ctxt) d rtail) ctxt
+          push_named_context_val (f ctxt.env_named_ctx d rtail) ctxt
         else
           let ctxt' = aux (Context.Named.add d rtail) ctxt in
           push_named_context_val d ctxt'
