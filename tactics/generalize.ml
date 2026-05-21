@@ -67,7 +67,7 @@ let bring_hyps hyps =
       let env = Proofview.Goal.env gl in
       let sigma = Proofview.Goal.sigma gl in
       let concl = Proofview.Goal.concl gl in
-      let newcl = Context.Named.fold_outside (fun d c -> mkNamedProd_or_LetIn sigma d c) hyps ~init:concl in
+      let newcl = Context.Named.fold_inside (fun c d -> mkNamedProd_or_LetIn sigma d c) ~init:concl hyps in
       let args = Context.Named.instance mkVar hyps in
       Refine.refine_with_principal ~typecheck:false begin fun sigma ->
         let (sigma, ev) =
