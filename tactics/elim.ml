@@ -44,7 +44,7 @@ let general_elim_using mk_elim (ind, u, args) id = match mk_elim with
 let elim_on_ba tac nassums =
   Proofview.Goal.enter begin fun gl ->
   let branches =
-    try Context.Named.firstn nassums (Proofview.Goal.hyps gl)
+    try Context.Named.rev (Context.Named.firstn nassums (Proofview.Goal.hyps gl))
     with Failure _ -> CErrors.anomaly (Pp.str "make_elim_branch_assumptions.")
   in
   tac branches
