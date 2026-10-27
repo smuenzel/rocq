@@ -197,7 +197,7 @@ let shared_size_of_pos pos =
 (*s Total size of the allocated ocaml heap. *)
 
 let heap_size () =
-  let stat = Gc.stat ()
+  let stat = Gc.full_major (); Gc.quick_stat ()
   and control = Gc.get () in
   let max_words_total = stat.Gc.heap_words + control.Gc.minor_heap_size in
   (max_words_total * (Sys.word_size / 8))

@@ -35,8 +35,8 @@ check_variable () {
 
 : "${coq_pr_number:=}"
 : "${coq_pr_comment_id:=}"
-: "${new_ocaml_version:=5.4.1}"
-: "${old_ocaml_version:=5.4.1}"
+: "${new_ocaml_version:=git+file:///home/stefan/development/ocaml/ocaml#global-register-usage}"
+: "${old_ocaml_version:=git+file:///home/stefan/development/ocaml/ocaml#trunk}"
 : "${new_ocaml_flambda:=1}"
 : "${old_ocaml_flambda:=1}"
 : "${new_coq_repository:=${CI_REPOSITORY_URL:-.}}"
@@ -79,7 +79,6 @@ if echo "$num_of_iterations" | grep '^[1-9][0-9]*$' 2> /dev/null > /dev/null; th
 else
     echo
     echo "ERROR: num_of_iterations \"$num_of_iterations\" is not a positive integer." > /dev/stderr
-    print_man_page_hint
     exit 1
 fi
 
@@ -146,7 +145,7 @@ echo "DEBUG: auto_overlays = $auto_overlays"
 
 # We put local binaries such as opam in .bin and extend PATH
 BIN=$(pwd)/.bin
-mkdir "$BIN"
+mkdir -p "$BIN"
 wget https://github.com/ocaml/opam/releases/download/2.3.0/opam-2.3.0-x86_64-linux -O "$BIN"/opam
 chmod +x "$BIN"/opam
 
@@ -382,6 +381,8 @@ create_opam() {
     local OPAM_OVERRIDE_URLS="$4"
     local USE_FLAMBDA="$5"
 
+    local OPAM_COMP="$OCAML_VER"
+
     export OPAMROOT="$OPAM_DIR"
     export COQ_RUNNER="$RUNNER"
 
@@ -391,15 +392,17 @@ create_opam() {
     # Allow experimental compiler switches
     opam repo add -q --set-default ocaml-pr https://github.com/ejgallego/ocaml-pr-repository.git
     # Rest of default switches
-    opam repo add -q --set-default iris-dev "https://github.com/rocq-iris/opam.git"
+    opam repo add -q --set-default iris-dev "/home/stefan/development/iris-opam-dev"
 
-    local comp_packages
     if [[ $USE_FLAMBDA = 1 ]];
-    then comp_packages=--packages=ocaml-variants.${OCAML_VER}+options,ocaml-option-flambda
-    else comp_packages=ocaml-base-compiler.$OCAML_VER
+    then flambda=ocaml-option-flambda
+    else flambda=
     fi
 
-    opam switch create -qy -j "$number_of_processors" "ocaml-$RUNNER" $comp_packages
+    opam switch create --empty -qy "ocaml-$RUNNER"
+    opam pin add --switch "ocaml-$RUNNER" -n ocaml-variants.5.7.0+trunk "$OPAM_COMP"
+    opam pin list
+    opam install --switch "ocaml-$RUNNER" -qy -j "$number_of_processors" ocaml-variants $flambda
     eval $(opam env)
 
     if [ ! -z "$BENCH_DEBUG" ]; then opam config list; fi

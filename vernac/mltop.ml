@@ -435,7 +435,7 @@ let print_ml_modules () =
   str"Loaded ML Modules: " ++ pr_vertical_list str (List.map PluginSpec.pp l)
 
 let print_gc () =
-  let stat = Gc.stat () in
+  let stat = Gc.full_major (); Gc.quick_stat () in
   let msg =
     str "minor words: " ++ real stat.Gc.minor_words ++ fnl () ++
     str "promoted words: " ++ real stat.Gc.promoted_words ++ fnl () ++
